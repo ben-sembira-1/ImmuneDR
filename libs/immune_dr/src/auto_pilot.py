@@ -31,7 +31,7 @@ class AutoPilot:
         self._start_time = time.time()
 
         self._drone = drone
-        self._request_messages_interval()
+        self._drone.request_all_messages()
         self._drone.update()
         # Auto navigation with GPS
         self._waypoints = queue.Queue
@@ -183,7 +183,3 @@ class AutoPilot:
         while True:
             yield
             self._counter += 1
-
-    def _request_messages_interval(self):
-        for m in AutoPilot.MESSAGES_TO_REQUEST_INTERVAL:
-            self._drone.request_message_interval(m, interval=4e5)

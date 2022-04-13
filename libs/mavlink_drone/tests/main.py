@@ -9,9 +9,9 @@ def main():
     continue_with_enter("Connect")
     drone = Drone("udpin:localhost:14560", source_system=0)
     continue_with_enter("Land")
-    drone.set_mode("LAND")
+    drone.mode = "LAND"
     continue_with_enter("Change mode to guided")
-    drone.set_mode("GUIDED")
+    drone.mode = "GUIDED"
     continue_with_enter("Arm and takeoff")
     drone.rc(throttle=-1)
     drone.arm()
@@ -23,7 +23,7 @@ def main():
     while ekf_action := input("ekf action: "):
         drone.fs_ekf_action = int(ekf_action)
     continue_with_enter("Land")
-    drone.set_mode("LAND")
+    drone.mode = "LAND"
 
 
 if __name__ == '__main__':
