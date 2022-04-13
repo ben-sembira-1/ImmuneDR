@@ -81,11 +81,13 @@ class AutoPilot:
     def _rout_receive_updated_mavlink_messages(self):
         while True:
             yield
+            self._log("Updating mavlink")
             self._drone.update()
 
     def _rout_check_failsafes(self):
         while True:
             yield
+            self._log("Checking failsafes")
             self._ekf_failsafe = self._drone.gps_raw.fix_type in {
                 mavlink.GPS_FIX_TYPE_NO_FIX,
                 mavlink.GPS_FIX_TYPE_NO_GPS,
@@ -101,11 +103,13 @@ class AutoPilot:
     def _rout_enable_dr_if_needed(self):
         while True:
             yield
+            self._log("Enabling DR if needed")
             if (
                 not self._dr_active
                 and self._ekf_failsafe
                 and self._gcs_loss_counter > AutoPilot.MAX_GCS_LOSSES
             ):
+                self._log("Enabling DR...")
                 self._drone.sysid_mygcs = self._drone.source_system_id
                 self._dr_active = True
 
@@ -113,6 +117,7 @@ class AutoPilot:
         new_position = False
         while True:
             yield
+            self._log("Updating home comapss bearing")
             if not self._ekf_failsafe:
                 self._last_position = self._drone.current_position
                 new_position = self._last_position is not None
@@ -131,6 +136,7 @@ class AutoPilot:
         angle_good_streak = 0
         while True:
             yield
+            self._log("Updating RC commands")
             if self._dr_active:
                 # Todo: This needs to be done somewhere because
                 #  if the rc failsafe will take place before the
@@ -167,6 +173,7 @@ class AutoPilot:
     def _rout_send_rc_commands(self):
         while True:
             yield
+            self._log("Sending RC commands")
             if self._next_rc_commands is not None:
                 self._drone.rc(*self._next_rc_commands)
                 self._log(f"Sending RC commands: {self._next_rc_commands}")
@@ -174,6 +181,7 @@ class AutoPilot:
     def _rout_log_attitude(self):
         while True:
             yield
+            self._log("Logging attitude")
             attitude = self._drone.attitude
             self._log(
                 f"Pitch: {attitude.pitch:.2f}, Roll: {attitude.roll:.2f}, Yaw: {attitude.yaw:.2f}"
