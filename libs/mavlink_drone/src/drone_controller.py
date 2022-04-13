@@ -38,7 +38,14 @@ class Messages(int, enum.Enum):
 
 
 class Drone:
-    def __init__(self):
+
+    def __init__(
+        self, source_system: int, source_component: int = mavlink.MAV_COMP_ID_AUTOPILOT1
+    ):
+        assert 0 < source_system < 255
+        assert 0 < source_component < 255
+        self.source_system_id = source_system
+        self.source_component_id = source_component
         self._boot_time_sec: float = time.time()
         self._drone: mavutil.mavfile = None
 
@@ -50,12 +57,16 @@ class Drone:
     ) -> None:
         """The real connection time can be different then connectin_timeout_sec but it will be close."""
         self._log("Connecting...")
-        self._drone = mavutil.mavlink_connection(address)
+        self._drone = mavutil.mavlink_connection(
+            address,
+            source_system=self.source_system_id,
+            source_component=self.source_component_id,
+        )
         # The function wait_heartbeat represent "no timeout" as timeout=None.
         if self._drone.wait_heartbeat(timeout=connection_timeout_sec) is None:
             raise FailedToConnectDroneError("End of timeout")
         self._log("Connected!")
-        
+
         time.sleep(2)
         # Make sure that all the messages arrive successfully
         self.request_all_messages()
@@ -66,7 +77,7 @@ class Drone:
             param1=message_id,
             param2=interval,
         )
-    
+
     def request_all_messages(self) -> None:
         for message in Messages:
             self._log(repr(message))
@@ -85,9 +96,14 @@ class Drone:
                 pass
     
     @property
+    def gcs_heartbeat(self):
+        # Todo: implement
+        raise NotImplementedError()
+
+    @property
     def sysid_mygcs(self):
         raise NotImplementedError()
-    
+
     @sysid_mygcs.setter
     def sysid_mygcs(self, new_gcs_id: int):
         assert 0 <= new_gcs_id <= 255
@@ -101,23 +117,24 @@ class Drone:
     def fs_ekf_action(self, action: int):
         assert 1 <= action <= 3
         self._set_parameter(b"FS_EKF_ACTION", action, mavlink.MAV_PARAM_TYPE_UINT8)
-    
+
     @property
     def sim_gps_disable(self):
         raise NotImplementedError()
-    
+
     @sim_gps_disable.setter
     def sim_gps_disable(self, value: bool):
-        self._set_parameter(b"SIM_GPS_DISABLE", int(value), mavlink.MAV_PARAM_TYPE_UINT8)
-    
+        self._set_parameter(
+            b"SIM_GPS_DISABLE", int(value), mavlink.MAV_PARAM_TYPE_UINT8
+        )
+
     @property
     def sim_rc_fail(self):
         raise NotImplementedError()
-    
+
     @sim_rc_fail.setter
     def sim_rc_fail(self, value: bool):
         self._set_parameter(b"SIM_RC_FAIL", int(value), mavlink.MAV_PARAM_TYPE_UINT8)
-
 
     @property
     def home_position(self):
@@ -160,7 +177,7 @@ class Drone:
     @property
     def gps_raw(self):
         return self._receive_message(Messages.GPS_RAW_INT)
-    
+
     @property
     def sim_state(self):
         return self._receive_message(Messages.SIM_STATE)
@@ -186,7 +203,11 @@ class Drone:
                 mavlink.MAV_CMD_DO_SET_HOME, param1=USE_CURRENT_LOCATION
             )
         else:
-            latitude_radians, longitude_radians, altitude_meters = position_radians_meters
+            (
+                latitude_radians,
+                longitude_radians,
+                altitude_meters,
+            ) = position_radians_meters
 
             latitude_degrees_e7 = int(math.degrees(latitude_radians) * 1e7)
             longitude_degrees_e7 = int(math.degrees(longitude_radians) * 1e7)
@@ -198,13 +219,12 @@ class Drone:
                 param6=longitude_degrees_e7,
                 param7=altitude_meters,
             )
-    
+
     @property
     def mode(self):
         heartbeat = self._receive_message(Messages.HEARTBEAT)
         return mavutil.mode_string_v10(heartbeat)
-        
-    
+
     @mode.setter
     def mode(self, mode: str):
         print(f"Setting mode to {mode.upper()}...")

@@ -227,7 +227,7 @@ class TestDr:
 
     @pytest.fixture
     def drone(self, simulation: subprocess.Popen) -> drone_controller.Drone:
-        my_drone = drone_controller.Drone()
+        my_drone = drone_controller.Drone(source_system=config.MISSION_COMPUTER_MAVLINK_SYSTEM_ID)
         my_drone.connect(
             f"udp:localhost:{config.TESTS_PORT}",
             connection_timeout_sec=config.DRONE_CONNECT_TO_SIMULATION_TIMEOUT_SEC,
@@ -284,15 +284,16 @@ class TestDr:
 
     @pytest.mark.system
     # @pytest.mark.skip(reason="Tested")
-    @pytest.mark.parametrize(
-        "offset_latitude",
-        [config.DR_AXIS_DISTANCE_DEGREES, -config.DR_AXIS_DISTANCE_DEGREES, 0],
-    )
-    @pytest.mark.parametrize(
-        "offset_longitude",
-        [config.DR_AXIS_DISTANCE_DEGREES, -config.DR_AXIS_DISTANCE_DEGREES, 0],
-    )
-    # @pytest.mark.parametrize("offset_latitude, offset_longitude", [(config.DR_AXIS_DISTANCE_DEGREES, config.DR_AXIS_DISTANCE_DEGREES)])
+    # @pytest.mark.parametrize(
+    #     "offset_latitude",
+    #     [config.DR_AXIS_DISTANCE_DEGREES, -config.DR_AXIS_DISTANCE_DEGREES, 0],
+    # )
+    # @pytest.mark.parametrize(
+    #     "offset_longitude",
+    #     [config.DR_AXIS_DISTANCE_DEGREES, -config.DR_AXIS_DISTANCE_DEGREES, 0],
+    # )
+    # Use this and comment the 2 above markers for a single test:
+    @pytest.mark.parametrize("offset_latitude, offset_longitude", [(config.DR_AXIS_DISTANCE_DEGREES, config.DR_AXIS_DISTANCE_DEGREES)])
     def test_dr_direction(
         self,
         flying_drone: drone_controller.Drone,
@@ -347,6 +348,11 @@ class TestDr:
             longitude=config.DR_AXIS_DISTANCE_DEGREES,
         )
         with auto_pilot.AutoPilot(flying_drone, simulation_speedup=config.SPEED_UP):
+            assert (
+                flying_drone.mode == "GUIDED"
+            ), "Something wrong happend, the drone is not in GUIDED mode"
+            # Let the autopilot get the drone position before we disable it.
+            utils.wait(2)
             # Set the main GCS ID to be something that does not exist
             # so the ArduPilot will not get heartbeats and RC overrides
             # (see chapter 8.2. GCS Failsafe Trigger Code Research in DisableAutoLand.md).
@@ -360,6 +366,7 @@ class TestDr:
                 drone_obj=flying_drone,
                 mode="ALT_HOLD",
             )
+            utils.wait(config.RTL_TO_ALTHOLD_STOP_TIME_SECONDS)
             self.wait_for_dr_start(
                 drone_obj=flying_drone,
                 home_position=new_home_position,
@@ -397,4 +404,19 @@ class TestDr:
     @pytest.mark.skip(reason="WIP")
     def test_dr_trigger_rc_failure_and_gps_failure_imidiatly_after(self):
         """Should change mode to LAND and then cancel it and trigger DR"""
+        assert False
+    
+    @pytest.mark.system
+    @pytest.mark.skip(reason="WIP")
+    def test_dr_gps_returns_no_rc():
+        assert False
+    
+    @pytest.mark.system
+    @pytest.mark.skip(reason="WIP")
+    def test_dr_gps_returns_rc_healthy():
+        assert False
+    
+    @pytest.mark.system
+    @pytest.mark.skip(reason="WIP")
+    def test_dr_rc_returns_no_gps():
         assert False
