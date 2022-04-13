@@ -1,0 +1,24 @@
+0000000000000000000000000000000000000000 fd35bc9f5dee576663158de3602e05db55a54672 ben <ben@ben> 1644436027 +0200	commit (initial): First commit
+fd35bc9f5dee576663158de3602e05db55a54672 bcfecd04b76e52a99adff1839662183d8fcf8439 ben <ben@ben> 1644436059 +0200	commit (amend): First commit
+bcfecd04b76e52a99adff1839662183d8fcf8439 1beb36a25a205464089540f32b90314c8657ac6e ben <ben@ben> 1644436071 +0200	commit (amend): First commit
+1beb36a25a205464089540f32b90314c8657ac6e 6aad03dd571a3101b9ead1c792e646e20f01eccc ben <ben@ben> 1644445803 +0200	commit: Added all the routines for auto DR, ekf failsafe does not work, and receiving the yaw angle does not work
+6aad03dd571a3101b9ead1c792e646e20f01eccc e97d87e23b495de4721fe5912bfdc5e6fae1d4c2 ben <ben@ben> 1644578525 +0200	commit: Changed to radians
+e97d87e23b495de4721fe5912bfdc5e6fae1d4c2 f376c01a804ef4e8f27121e3af12b63063eca17a ben <ben@ben> 1644578570 +0200	commit: Moved main to be out of the project
+f376c01a804ef4e8f27121e3af12b63063eca17a 8593a2cc6e66818eb68f2ee754a8ab3e427f4fa1 ben <ben@ben> 1644578697 +0200	commit: Added gps failure sense and created a simple POC, something works weird in the direction the drone is flying
+8593a2cc6e66818eb68f2ee754a8ab3e427f4fa1 18afda1c2a874d2c79748d6f1fb69cfbda303c6b ben <ben@ben> 1644578724 +0200	commit: Simple test to mavlink messages
+18afda1c2a874d2c79748d6f1fb69cfbda303c6b a1c79338b4e5585983091704abaeb45b9446bdf2 ben <ben@ben> 1644770620 +0200	commit: Added a todo for future development
+a1c79338b4e5585983091704abaeb45b9446bdf2 a8cf2b5aeed112a742f13551a9c45c68b4cb495c ben <ben@ben> 1648975339 +0300	commit: Mavlink message reading amount optimization
+a8cf2b5aeed112a742f13551a9c45c68b4cb495c 99af99cd0c268ea0e5a0019574b8cc491ce3afb7 ben <ben@ben> 1648977157 +0300	commit: Fixed delay error drift
+99af99cd0c268ea0e5a0019574b8cc491ce3afb7 5a8e4c03ab02f0e88d5fb7254d925769071f8259 ben <ben@ben> 1648978693 +0300	commit: Made the yaw controll more agressive
+5a8e4c03ab02f0e88d5fb7254d925769071f8259 294285c53f09cb07f6d75083779750cd3dcc1778 ben <ben@ben> 1649002183 +0300	commit: Fixed yawing to correct angle and optimized waiting to mavlink messages
+294285c53f09cb07f6d75083779750cd3dcc1778 014fdd8108aa45bf36557725193c4fa51524620e ben <ben@ben> 1649058213 +0300	commit: Added attitude logging
+014fdd8108aa45bf36557725193c4fa51524620e 8e83557c1cfd4b7720d50433ed6f6959777de1af ben <ben@ben> 1649059852 +0300	commit: Fixed DR curves
+8e83557c1cfd4b7720d50433ed6f6959777de1af eb2f9fd487d40778afa6aa2243cf833b010a8007 ben <ben@ben> 1649079020 +0300	commit: Changed the pitch and yaw controll
+eb2f9fd487d40778afa6aa2243cf833b010a8007 ddafe0b5b795d56b34ce2433d1da766dfe27d99b ben <ben@ben> 1649079103 +0300	commit (amend): Changed the pitch and yaw control
+ddafe0b5b795d56b34ce2433d1da766dfe27d99b 9a4604c65e3ad100f9b0e117cee6139693d7ac35 ben <ben@ben> 1649143878 +0300	commit: Removed experimental code
+9a4604c65e3ad100f9b0e117cee6139693d7ac35 563cc40d6a5fbddca72b1807b086c8f215237c93 ben <ben@ben> 1649145052 +0300	commit: Reorderd directories
+563cc40d6a5fbddca72b1807b086c8f215237c93 2c087b68622454c50fc6b457c8c3382b7c8b5bf8 ben <ben@ben> 1649146153 +0300	commit: Fixed names
+2c087b68622454c50fc6b457c8c3382b7c8b5bf8 daff224312e6f39e1e37767ddc0eab76317f8bf5 ben <ben@ben> 1649146808 +0300	commit: Fixed imports
+daff224312e6f39e1e37767ddc0eab76317f8bf5 444f7c976c568170a8b36805e77edf8331fad3db ben <ben@ben> 1649792888 +0300	commit: Added speedup for simulation, tests and fixed some bugs
+444f7c976c568170a8b36805e77edf8331fad3db 8cde4da4f3a80d86efa32028c5dc071abc82b9e0 ben <ben@ben> 1649793148 +0300	commit: Changed to the original distance caculation
+8cde4da4f3a80d86efa32028c5dc071abc82b9e0 ce8b8eba76f91a9150d456bc22616296cb194aa4 ben <ben@ben> 1649856551 +0300	commit: Changed logs, yield position and refactored

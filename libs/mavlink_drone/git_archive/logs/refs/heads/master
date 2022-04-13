@@ -1,0 +1,13 @@
+0000000000000000000000000000000000000000 8301e76a43270650ac7276c3a9d8d41a7b31a53b ben <ben@ben> 1644342855 +0200	commit (initial): Simple main that connects, takes off, and rotating
+8301e76a43270650ac7276c3a9d8d41a7b31a53b 6053f2a2965f87bbe742e11f9d6238cc14b6da80 ben <ben@ben> 1644343699 +0200	commit: Added the QDrone object that takes care on sending the correct mavlink message
+6053f2a2965f87bbe742e11f9d6238cc14b6da80 de336b6d498c5d004e0f4237cbfaaaa9b46244a4 ben <ben@ben> 1644355784 +0200	commit: Manual control on rc works partly using MANUAL_CONTROL. It is not working well
+de336b6d498c5d004e0f4237cbfaaaa9b46244a4 cedee6993272dbb9cbcaa63982789510fb7c7d31 ben <ben@ben> 1644357868 +0200	commit: Changed RC commands to be more accurate. If to much pitch is given the drone crashes, I do not know why, alt_hold should not hold on the altitude?! Maybe because of the angle of the platform or its speed it is harder to figger out what exactly is the height.
+cedee6993272dbb9cbcaa63982789510fb7c7d31 1add7daad0ab3bc3227c20b5550b9daaea9b81e7 ben <ben@ben> 1644358679 +0200	commit: Added comments
+1add7daad0ab3bc3227c20b5550b9daaea9b81e7 fe5e83564c49d3e64ce59eddc14d8798d56638a8 ben <ben@ben> 1644406552 +0200	commit: Added __init__.py
+fe5e83564c49d3e64ce59eddc14d8798d56638a8 f327ba87357d5502435c302c9e8373d73c680fb8 ben <ben@ben> 1644445872 +0200	commit: Added more messages to request from the drone
+f327ba87357d5502435c302c9e8373d73c680fb8 8f754d28607190272d44e60ae22274668036a69f ben <ben@ben> 1644578364 +0200	commit: Changed the position mavlink messages to return values in SI units
+8f754d28607190272d44e60ae22274668036a69f e846f9ea2a21482c638b918fbc23e26177516714 ben <ben@ben> 1649002238 +0300	commit: Changed messages receive mechanizem
+e846f9ea2a21482c638b918fbc23e26177516714 c82c0d4a5ccc34b4880567ee2fb29f1b60028da6 ben <ben@ben> 1649145077 +0300	commit: Reorderd directories
+c82c0d4a5ccc34b4880567ee2fb29f1b60028da6 2a7920f8982a14ff990948fce12b64fac030e95f ben <ben@ben> 1649146115 +0300	commit: Changed names, and added an armed property
+2a7920f8982a14ff990948fce12b64fac030e95f 3b725ad8eb8d39768a7bd9aea87c110eaa9d30db ben <ben@ben> 1649792950 +0300	commit: Changed the drone class to fit the tests
+3b725ad8eb8d39768a7bd9aea87c110eaa9d30db 7c16f59f41bebc6a51f07204a2d458128a5e3a88 ben <ben@ben> 1649856640 +0300	commit: Added documentation, removed prints, changed set_home parameters
