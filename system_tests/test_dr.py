@@ -286,7 +286,7 @@ class TestDr:
         ), "The drone failed to takeoff, its heigt is wrong."
 
     @pytest.mark.system
-    # @pytest.mark.skip(reason="Tested")
+    # @pytest.mark.skip(reason="WIP")
     # @pytest.mark.parametrize(
     #     "offset_latitude",
     #     [config.DR_AXIS_DISTANCE_DEGREES, -config.DR_AXIS_DISTANCE_DEGREES, 0],
@@ -326,9 +326,8 @@ class TestDr:
                 flying_drone.mode == "GUIDED"
             ), "Something wrong happend, the drone is not in GUIDED mode"
             # Let the autopilot get the drone position before we disable it.
-            utils.wait(10)
+            utils.wait(2)
             flying_drone.sim_gps_disable = True
-            utils.wait(10, absolute=True)
             self.wait_for_mode_change(
                 drone_obj=flying_drone,
                 mode="ALT_HOLD",
