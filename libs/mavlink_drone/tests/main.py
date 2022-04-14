@@ -7,7 +7,7 @@ def continue_with_enter(msg: str) -> None:
 
 def main():
     continue_with_enter("Connect")
-    drone = Drone("udpin:localhost:14560", source_system=0)
+    drone = Drone("udpin:localhost:14560", source_system_id=0)
     continue_with_enter("Land")
     drone.mode = "LAND"
     continue_with_enter("Change mode to guided")

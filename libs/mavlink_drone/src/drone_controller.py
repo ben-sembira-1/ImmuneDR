@@ -55,18 +55,19 @@ PARAMETER_TYPE_MAP = {
     Parameter.SIM_RC_FAIL: mavlink.MAV_PARAM_TYPE_UINT8,
 }
 
+MESSAGE_RECEIVE_TIMEOUT_SEC = 2
+PARAMETER_RECEIVE_TIMEOUT_SEC = 1
+
 
 class Drone:
-    MESSAGE_RECEIVE_TIMEOUT_SEC = 3e-1
-    PARAMETER_RECEIVE_TIMEOUT_SEC = 3e-2
-
     def __init__(
-        self, source_system: int, source_component: int = mavlink.MAV_COMP_ID_AUTOPILOT1
+        self, source_system_id: int, source_component_id: int = mavlink.MAV_COMP_ID_AUTOPILOT1
     ):
-        assert 0 < source_system < 255
-        assert 0 < source_component < 255
-        self.source_system_id = source_system
-        self.source_component_id = source_component
+        assert 0 < source_system_id < 255
+        assert 0 < source_component_id < 255
+        self.source_system_id = source_system_id
+        self.source_component_id = source_component_id
+        # Todo: add simuation speedup parameter for effective testing.
         self._boot_time_sec: float = time.time()
         self._drone: Optional[mavutil.mavfile] = None
 
@@ -121,7 +122,7 @@ class Drone:
 
     @property
     def sysid_mygcs(self) -> ParameterValue:
-        return self._get_parameter(Parameter.SYSID_MYGCS)
+        return self.get_parameter(Parameter.SYSID_MYGCS)
 
     @sysid_mygcs.setter
     def sysid_mygcs(self, new_gcs_id: int) -> None:
@@ -130,7 +131,7 @@ class Drone:
 
     @property
     def fs_ekf_action(self) -> ParameterValue:
-        return self._get_parameter(Parameter.FS_EKF_ACTION)
+        return self.get_parameter(Parameter.FS_EKF_ACTION)
 
     @fs_ekf_action.setter
     def fs_ekf_action(self, action: int) -> None:
@@ -139,7 +140,7 @@ class Drone:
 
     @property
     def sim_gps_disable(self) -> ParameterValue:
-        return self._get_parameter(Parameter.SIM_GPS_DISABLE)
+        return self.get_parameter(Parameter.SIM_GPS_DISABLE)
 
     @sim_gps_disable.setter
     def sim_gps_disable(self, value: bool) -> None:
@@ -147,7 +148,7 @@ class Drone:
 
     @property
     def sim_rc_fail(self) -> ParameterValue:
-        return self._get_parameter(Parameter.SIM_RC_FAIL)
+        return self.get_parameter(Parameter.SIM_RC_FAIL)
 
     @sim_rc_fail.setter
     def sim_rc_fail(self, value: bool) -> None:
@@ -155,29 +156,29 @@ class Drone:
 
     # ------------------- Messages -------------------
 
-    @property
-    def gcs_heartbeat(self) -> Optional[mavlink.MAVLink_heartbeat_message]:
-        end_time = time.time() + Drone.MESSAGE_RECEIVE_TIMEOUT_SEC
+    def get_gcs_heartbeat(self, blocking: bool = True):
         while (
             heartbeat_message := self._receive_message(
                 message=Message.HEARTBEAT,
                 blocking=True,
-                timeout=end_time - time.time(),
             )
         ) is not None:
-            self._log(f"Received heartbeat: {heartbeat_message}")
-            my_gcs = self.sysid_mygcs
+            self._log(f"Received heartbeat from {heartbeat_message.get_srcSystem()}: {heartbeat_message}")
+            my_gcs = self.get_parameter(Parameter.SYSID_MYGCS)
             self._log(f"My GCS: {my_gcs}")
             if heartbeat_message.get_srcSystem() == my_gcs:
                 return heartbeat_message
         return None
 
     @property
-    def home_position(self) -> mavlink.MAVLink_home_position_message:
+    def gcs_heartbeat(self) -> Optional[mavlink.MAVLink_heartbeat_message]:
+        return self.get_gcs_heartbeat(blocking=False)
+    
+    def get_home_position(self, blocking: bool = True):
         """
         :return: Home drone position in SI units (meters, seconds, radians)
         """
-        position = self._receive_message(Message.HOME_POSITION)
+        position = self._receive_message(Message.HOME_POSITION, blocking=blocking)
         position.latitude = math.radians(position.latitude / 1e7)
         position.longitude = math.radians(position.longitude / 1e7)
         position.altitude /= 1e3
@@ -185,11 +186,14 @@ class Drone:
         return position
 
     @property
-    def current_position(self) -> mavlink.MAVLink_global_position_int_message:
+    def home_position(self) -> mavlink.MAVLink_home_position_message:
+        return self.get_home_position(blocking=False)
+    
+    def get_current_position(self, blocking: bool = True):
         """
         :return: Current drone position in SI units (meters, seconds, radians)
         """
-        position = self._receive_message(Message.GLOBAL_POSITION_INT)
+        position = self._receive_message(Message.GLOBAL_POSITION_INT, blocking=blocking)
         position.lat = math.radians(position.lat / 1e7)
         position.lon = math.radians(position.lon / 1e7)
         position.alt /= 1e1
@@ -201,6 +205,10 @@ class Drone:
 
         return position
 
+    @property
+    def current_position(self) -> mavlink.MAVLink_global_position_int_message:
+        return self.get_current_position(blocking=False)
+    
     @property
     def attitude(self) -> mavlink.MAVLink_attitude_message:
         return self._receive_message(Message.ATTITUDE)
@@ -373,8 +381,8 @@ class Drone:
 
     def _receive_parameter(
         self,
-        parameter: Union[Parameter, Message] = None,
-        timeout: Optional[float] = PARAMETER_RECEIVE_TIMEOUT_SEC,
+        parameter: Parameter,
+        timeout: float,
     ) -> ParameterValue:
         self._request_parameter(parameter)
         end_time = time.time() + timeout
@@ -390,8 +398,10 @@ class Drone:
                 return param_value_message
         return None
 
-    def _get_parameter(self, parameter: Parameter) -> Union[int, float]:
-        parameter_received: ParameterValue = self._receive_parameter(parameter)
+    def get_parameter(
+        self, parameter: Parameter, timeout: float = PARAMETER_RECEIVE_TIMEOUT_SEC
+    ) -> Union[int, float]:
+        parameter_received: ParameterValue = self._receive_parameter(parameter, timeout)
         if parameter_received is None:
             return None
         return parameter_received.param_value

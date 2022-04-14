@@ -3,13 +3,15 @@ import math
 
 # -------------------- Simulation --------------------
 # For chaning the speedup, change the SIM_SPEEDUP in the system_tests/mav.param as well.
-SPEED_UP: int = 5
+SPEED_UP: int = 1
 
 SIM_VEHICLE_PATH = "/home/ben/clones/ardupilot/Tools/autotest/sim_vehicle.py"
-TESTS_PORT = 14570
+MISSION_PLANNER_PORT = 14580  # For future use
+DR_AUTOPILOT_PORT = 14570
+SITL_PORT = 14560
 SIMULATION_DIRECTORY_PATH = "system_tests/simulation_directory"
 MAV_PARAM_FILE_PATH = "system_tests/mav.parm"
-MISSION_COMPUTER_MAVLINK_SYSTEM_ID = 1
+MISSION_COMPUTER_MAVLINK_SYSTEM_ID = 2
 
 # -------------------- Distances --------------------
 FLIGHT_ALTITUDE_METERS = 50
@@ -21,7 +23,7 @@ DR_PERCISION_METERS_PER_DISTANCE = 0.15
 
 # -------------------- Timeouts --------------------
 INITIALIZATION_TIMEOUT_SEC = 90
-DRONE_CONNECT_TO_SIMULATION_TIMEOUT_SEC = 10
+DRONE_CONNECT_TO_SIMULATION_TIMEOUT_SEC = 10 / SPEED_UP
 MAX_SET_HOME_VALIDATION_TIMEOUT_SECONDS = 3
 MAX_DR_YAW_INITIALIZATION_TIMEOUT_SECONDS = 20
 DR_TIMEOUT_SECONDS_PER_METER = 0.15

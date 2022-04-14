@@ -68,14 +68,14 @@ class TestDr:
         if altitude is not None:
             new_altitude = altitude
         else:
-            new_altitude = drone_obj.home_position.altitude
+            new_altitude = drone_obj.get_home_position(blocking=True).altitude
 
         if absolute:
             new_home_position = Position(
                 latitude=latitude, longitude=longitude, altitude=new_altitude
             )
         else:
-            current_location = drone_obj.current_position
+            current_location = drone_obj.get_current_position(blocking=True)
             new_home_position = Position(
                 latitude=current_location.lat + latitude,
                 longitude=current_location.lon + longitude,
@@ -85,7 +85,7 @@ class TestDr:
         drone_obj.set_home(position_radians_meters=new_home_position)
         if validation_timeout is not None:
             start_time = time.time()
-            current_home_position = drone_obj.home_position
+            current_home_position = drone_obj.get_home_position(blocking=True)
             while (
                 math.fabs(current_home_position.latitude - new_home_position.latitude)
                 > config.FLOAT_ERROR
@@ -98,7 +98,7 @@ class TestDr:
                     utils.time_since(start_time) < validation_timeout
                 ), f"set_home validation failed, current: {current_home_position}, updated: {new_home_position}"
                 utils.wait(1)
-                current_home_position = drone_obj.home_position
+                current_home_position = drone_obj.get_home_position(blocking=True)
         return new_home_position
 
     def got_closer(
@@ -203,15 +203,18 @@ class TestDr:
             shutil.rmtree(config.SIMULATION_DIRECTORY_PATH)
         os.makedirs(config.SIMULATION_DIRECTORY_PATH)
         shutil.copy2(config.MAV_PARAM_FILE_PATH, config.SIMULATION_DIRECTORY_PATH)
+        mavproxy_args = [
+            f'--cmd="set heartbeat {2 * config.SPEED_UP}"',
+            f"--out=udp:localhost:{config.DR_AUTOPILOT_PORT}",
+            # f"--out=udp:localhost:{config.MISSION_PLANNER_PORT}",
+        ]
         sitl_cmd = [
             "python3",
             config.SIM_VEHICLE_PATH,
             "-v",
             "ArduCopter",
             f"--add-param-file=mav.parm",
-            f'--mavproxy-args=--cmd="set heartbeat {2 * config.SPEED_UP}"',
-            # f"--speedup={config.SPEED_UP}",
-            f"--out=udp:localhost:{config.TESTS_PORT}",
+            f"--mavproxy-args={' '.join(mavproxy_args)}",
             "--map",
             "--console",
         ]
@@ -229,10 +232,10 @@ class TestDr:
     @pytest.fixture
     def drone(self, simulation: subprocess.Popen) -> drone_controller.Drone:
         my_drone = drone_controller.Drone(
-            source_system=config.MISSION_COMPUTER_MAVLINK_SYSTEM_ID
+            source_system_id=config.MISSION_COMPUTER_MAVLINK_SYSTEM_ID
         )
         my_drone.connect(
-            f"udp:localhost:{config.TESTS_PORT}",
+            f"udp:localhost:{config.DR_AUTOPILOT_PORT}",
             connection_timeout_sec=config.DRONE_CONNECT_TO_SIMULATION_TIMEOUT_SEC,
         )
         return my_drone
@@ -243,14 +246,18 @@ class TestDr:
 
         def time_valid() -> bool:
             return utils.time_since(start_time) < config.INITIALIZATION_TIMEOUT_SEC
-
+        
+        last_gps_raw = drone.gps_raw
         while time_valid() and (
-            drone.gps_raw is None
-            or drone.gps_raw.fix_type
-            in {mavlink.GPS_FIX_TYPE_NO_FIX, mavlink.GPS_FIX_TYPE_NO_GPS}
+            last_gps_raw is None
+            or (
+                last_gps_raw.fix_type
+                in {mavlink.GPS_FIX_TYPE_NO_FIX, mavlink.GPS_FIX_TYPE_NO_GPS}
+            )
         ):
             print(time_valid())
             utils.wait(1)
+            last_gps_raw = drone.gps_raw
         drone.mode = "GUIDED"
         while time_valid() and (drone.local_position is None):
             utils.wait(1)
@@ -326,7 +333,7 @@ class TestDr:
                 flying_drone.mode == "GUIDED"
             ), "Something wrong happend, the drone is not in GUIDED mode"
             # Let the autopilot get the drone position before we disable it.
-            utils.wait(2)
+            utils.wait(60, absolute=True)
             flying_drone.sim_gps_disable = True
             self.wait_for_mode_change(
                 drone_obj=flying_drone,

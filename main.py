@@ -3,7 +3,7 @@ from libs.mavlink_drone.src.drone_controller import Drone
 
 
 def main():
-    autopilot = AutoPilot(Drone("udpin:localhost:14560", source_system=0))
+    autopilot = AutoPilot(Drone("udpin:localhost:14560", source_system_id=0))
     autopilot.start_mission()
 
 
