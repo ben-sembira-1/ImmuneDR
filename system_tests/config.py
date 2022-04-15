@@ -7,8 +7,9 @@ SPEED_UP: int = 1
 
 SIM_VEHICLE_PATH = "/home/ben/clones/ardupilot/Tools/autotest/sim_vehicle.py"
 MISSION_PLANNER_PORT = 14580  # For future use
-DR_AUTOPILOT_PORT = 14570
+TESTS_PORT = 14570
 SITL_PORT = 14560
+TESTS_ADDRESS = f"udp:localhost:{TESTS_PORT}"
 SIMULATION_DIRECTORY_PATH = "system_tests/simulation_directory"
 MAV_PARAM_FILE_PATH = "system_tests/mav.parm"
 MISSION_COMPUTER_MAVLINK_SYSTEM_ID = 2

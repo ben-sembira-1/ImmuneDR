@@ -1,18 +1,11 @@
 import math
-import os
-import shutil
-import sys
-from typing import Optional, Tuple, NamedTuple
-import psutil
+from typing import Optional, NamedTuple
 import time
 import pytest
-import multiprocessing as mp
 import subprocess
-import signal
 from pymavlink import mavlink
 
-from system_tests import config
-from system_tests import utils
+from system_tests import config, utils
 
 from libs.mavlink_drone.src import drone_controller
 from libs.immune_dr.src import auto_pilot
@@ -198,55 +191,16 @@ class TestDr:
     # ----------------------------- Fixtures -----------------------------
 
     @pytest.fixture
-    def simulation(self) -> subprocess.Popen:
-        if os.path.exists(config.SIMULATION_DIRECTORY_PATH):
-            shutil.rmtree(config.SIMULATION_DIRECTORY_PATH)
-        os.makedirs(config.SIMULATION_DIRECTORY_PATH)
-        shutil.copy2(config.MAV_PARAM_FILE_PATH, config.SIMULATION_DIRECTORY_PATH)
-        mavproxy_args = [
-            f'--cmd="set heartbeat {2 * config.SPEED_UP}"',
-            f"--out=udp:localhost:{config.DR_AUTOPILOT_PORT}",
-            # f"--out=udp:localhost:{config.MISSION_PLANNER_PORT}",
-        ]
-        sitl_cmd = [
-            "python3",
-            config.SIM_VEHICLE_PATH,
-            "-v",
-            "ArduCopter",
-            f"--add-param-file=mav.parm",
-            f"--mavproxy-args={' '.join(mavproxy_args)}",
-            "--map",
-            "--console",
-        ]
-        sitl = subprocess.Popen(
-            sitl_cmd,
-            cwd=config.SIMULATION_DIRECTORY_PATH,
-            # stdout=subprocess.PIPE,
-            # stderr=subprocess.PIPE,
-            stdin=subprocess.PIPE,
-        )
-        TestDr.current_simulation = sitl
-        yield sitl
-        sitl.send_signal(signal.SIGINT)
-
-    @pytest.fixture
-    def drone(self, simulation: subprocess.Popen) -> drone_controller.Drone:
-        my_drone = drone_controller.Drone(
-            source_system_id=config.MISSION_COMPUTER_MAVLINK_SYSTEM_ID
-        )
-        my_drone.connect(
-            f"udp:localhost:{config.DR_AUTOPILOT_PORT}",
-            connection_timeout_sec=config.DRONE_CONNECT_TO_SIMULATION_TIMEOUT_SEC,
-        )
-        return my_drone
-
-    @pytest.fixture
-    def flying_drone(self, drone: drone_controller.Drone) -> drone_controller.Drone:
+    def flying_drone(self, simulation: subprocess.Popen, drone: drone_controller.Drone) -> drone_controller.Drone:
+        TestDr.current_simulation = simulation
         start_time = time.time()
-
         def time_valid() -> bool:
             return utils.time_since(start_time) < config.INITIALIZATION_TIMEOUT_SEC
         
+        drone.connect(
+            address=config.TESTS_ADDRESS,
+            connection_timeout_sec=config.DRONE_CONNECT_TO_SIMULATION_TIMEOUT_SEC,
+        )
         last_gps_raw = drone.gps_raw
         while time_valid() and (
             last_gps_raw is None
@@ -293,7 +247,7 @@ class TestDr:
         ), "The drone failed to takeoff, its heigt is wrong."
 
     @pytest.mark.system
-    # @pytest.mark.skip(reason="WIP")
+    @pytest.mark.skip(reason="WIP")
     # @pytest.mark.parametrize(
     #     "offset_latitude",
     #     [config.DR_AXIS_DISTANCE_DEGREES, -config.DR_AXIS_DISTANCE_DEGREES, 0],
