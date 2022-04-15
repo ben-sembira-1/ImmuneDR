@@ -1,35 +1,87 @@
+import time
 import subprocess
+from typing import Iterable
 
 import pytest
 
-from system_tests import config
+from system_tests import config, utils
 from libs.mavlink_drone.src import drone_controller
 
-@pytest.fixture(scope="class")
-def connected_drone(simulation: subprocess.Popen, drone: drone_controller.Drone) -> drone_controller.Drone:
+BINARY_VALID_PARAMETRIZE = (0, 1)
+VALID_PARAMETERS_VALUES = {
+    "sysid_mygcs": range(0, 256, 1),
+    "fs_ekf_action": (1, 2, 3),
+    "sim_gps_disable": BINARY_VALID_PARAMETRIZE,
+    "sim_rc_fail": BINARY_VALID_PARAMETRIZE,
+}
+INVALID_PARAMETERS_VALUES = {
+    "sysid_mygcs": (-1, 256, 2000),
+    "fs_ekf_action": (-1, 0, 4, 10),
+}
+
+
+@pytest.fixture()
+def connected_drone(
+    simulation: subprocess.Popen, drone: drone_controller.Drone
+) -> drone_controller.Drone:
     drone.connect(
         address=config.TESTS_ADDRESS,
-        connection_timeout_sec=config.DRONE_CONNECT_TO_SIMULATION_TIMEOUT_SEC
+        connection_timeout_sec=config.DRONE_CONNECT_TO_SIMULATION_TIMEOUT_SEC,
     )
-    return drone
+    drone.run()
+    yield drone
+    drone.stop()
 
-class TestParametersSetGet:
-    @pytest.mark.system
-    def test_sysid_mygcs(self, connected_drone: drone_controller.Drone):
-        parameter_name = "SYSID_MYGCS"
-        for parameter_value in [0, 1, 10, 255]:
-            connected_drone.sysid_mygcs = parameter_value
-            assert connected_drone.sysid_mygcs == parameter_value, f"Failed to set {parameter_name} to {parameter_value}"
-        for parameter_value in [-1, 256, 48576]:
-            with pytest.raises(AssertionError):
-                connected_drone.sysid_mygcs = parameter_value, f"Setting an invalid value did not raise exception."
-        
-    def test_sysid_mygcs(self, connected_drone: drone_controller.Drone):
-        parameter_name = 
-        for parameter_value in :
-            connected_drone. = parameter_value
-            assert connected_drone. == parameter_value, f"Failed to set {parameter_name} to {parameter_value}"
-        for parameter_value in :
-            with pytest.raises(AssertionError):
-                connected_drone. = parameter_value, f"Setting an invalid value to {parameter_name} did not raise exception."
-    
+
+@pytest.mark.system
+# @pytest.mark.skip("WIP")
+@pytest.mark.parametrize("parameter_attribute, values", VALID_PARAMETERS_VALUES.items())
+def test_parameter_valid_values(
+    connected_drone: drone_controller.Drone, parameter_attribute: str, values: Iterable
+):
+    for parameter_value in values:
+        connected_drone.__setattr__(parameter_attribute, parameter_value)
+        assert (
+            connected_drone.__getattribute__(parameter_attribute) == parameter_value
+        ), f"Failed to set {parameter_attribute} to {parameter_value}"
+
+
+@pytest.mark.system
+@pytest.mark.skip("sandbox")
+def test_test(connected_drone: drone_controller.Drone):
+    print(">>>>>>>>>>>> Requesting")
+    time_started = time.time()
+    connected_drone.update()
+    connected_drone.sysid_mygcs = 4
+    connected_drone._receive(
+        drone_controller.Parameter.SYSID_MYGCS, timeout=2, request=False
+    )
+    print(f"Time passed: {utils.time_since(time_started)}")
+    connected_drone._request_parameter(drone_controller.Parameter.SYSID_MYGCS)
+    connected_drone._receive_parameter(
+        drone_controller.Parameter.SYSID_MYGCS, timeout=2, request=False
+    )
+    print(f"Time passed: {utils.time_since(time_started)}")
+    print(
+        f"Time since last sysid_mygcs: {connected_drone._drone.time_since('SYSID_MYGCS')}"
+    )
+    assert False
+
+
+@pytest.mark.system
+@pytest.mark.skip("Tested")
+@pytest.mark.parametrize(
+    "parameter_attribute, values", INVALID_PARAMETERS_VALUES.items()
+)
+def test_parameter_invalid_values(
+    connected_drone: drone_controller.Drone, parameter_attribute: str, values: Iterable
+):
+    for parameter_value in values:
+        raised = False
+        try:
+            connected_drone.__setattr__(parameter_attribute, parameter_value)
+        except drone_controller.DroneInvalidParameterValueError:
+            raised = True
+        assert (
+            raised
+        ), f"Did not raise when trying to set {parameter_attribute} to be {parameter_value}"

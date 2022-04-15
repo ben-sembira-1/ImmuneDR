@@ -1,7 +1,8 @@
 import enum
 import math
+import threading
 import time
-from typing import NamedTuple, Optional, Tuple, Union
+from typing import NamedTuple, Optional, Tuple, Union, Dict
 
 from pymavlink import mavutil, mavlink
 
@@ -26,6 +27,10 @@ class DroneConditionYawWithoutGuidedModeError(DroneError):
 
 
 class FailedToConnectDroneError(DroneError):
+    pass
+
+
+class DroneInvalidParameterValueError(DroneError):
     pass
 
 
@@ -59,9 +64,16 @@ MESSAGE_RECEIVE_TIMEOUT_SEC = 2
 PARAMETER_RECEIVE_TIMEOUT_SEC = 1
 
 
+class MavlinkData(NamedTuple):
+    message: Optional[mavlink.MAVLink_message]
+    timestamp: float
+
+
 class Drone:
     def __init__(
-        self, source_system_id: int, source_component_id: int = mavlink.MAV_COMP_ID_AUTOPILOT1
+        self,
+        source_system_id: int,
+        source_component_id: int = mavlink.MAV_COMP_ID_AUTOPILOT1,
     ):
         assert 0 < source_system_id < 255
         assert 0 < source_component_id < 255
@@ -70,9 +82,22 @@ class Drone:
         # Todo: add simuation speedup parameter for effective testing.
         self._boot_time_sec: float = time.time()
         self._drone: Optional[mavutil.mavfile] = None
+        self._latest_mavlink_data: Dict[str, MavlinkData] = {}
+        self._recv_thread: threading.Thread = threading.Thread(
+            target=self._thr_update_mavlink_messages_loop, daemon=True
+        )
+        self._kill_recv_thread: bool = False
 
     def _log(self, message: str) -> None:
         print(f"[+{time.time() - self._boot_time_sec:.3f}] {message}")
+
+    def _wait(self, time_sec: float):
+        # Todo: In the future this will enable simulation speedup.
+        time.sleep(time_sec)
+
+    def _time_since(self, base_time_sec: float):
+        # Todo: In the future this will enable simulation speedup.
+        return time.time() - base_time_sec
 
     def connect(
         self, address: str, connection_timeout_sec: Optional[float] = None
@@ -89,9 +114,37 @@ class Drone:
             raise FailedToConnectDroneError("End of timeout")
         self._log("Connected!")
 
-        time.sleep(2)
         # Make sure that all the messages arrive successfully
         self.request_all_messages()
+
+    def run(self):
+        """This will open a thread that actively listens to all incoming relevant messages."""
+        if self._drone is None:
+            raise RuntimeError("Call connect before you call run")
+        self._recv_thread.start()
+
+    def stop(self):
+        MAX_JOIN_TIMEOUT_SEC = 1
+        self._kill_recv_thread = True
+        self._recv_thread.join(timeout=MAX_JOIN_TIMEOUT_SEC)
+        if self._recv_thread.is_alive():
+            self._log("!!! mavlink updater thread did not stop. !!!")
+
+    def _thr_update_mavlink_messages_loop(self):
+        COOLDOWN_SEC = 0.01
+        while not self._kill_recv_thread:
+            if (new_message := self._drone.recv_match(blocking=False)) is not None:
+                new_message: mavlink.MAVLink_message
+                new_mavlink_data = MavlinkData(message=new_message, timestamp=time.time())
+                self._latest_mavlink_data[new_message.get_type()] = new_mavlink_data
+                self._log(f"Recieved message: {new_message.get_type()}")
+                if new_message.get_type() == Message.PARAM_VALUE.name:
+                    new_message: mavlink.MAVLink_param_value_message
+                    self._latest_mavlink_data[new_message.param_id] = new_mavlink_data
+                    self._log(f"Received parameter: {new_message.param_id}")
+            else:
+                self._wait(COOLDOWN_SEC)
+                self._log("Cooling down")
 
     def _request_message_interval(self, message_id: int, interval=0) -> None:
         self._command_long_send(
@@ -122,11 +175,13 @@ class Drone:
 
     @property
     def sysid_mygcs(self) -> ParameterValue:
+        # import pdb; pdb.set_trace()
         return self.get_parameter(Parameter.SYSID_MYGCS)
 
     @sysid_mygcs.setter
     def sysid_mygcs(self, new_gcs_id: int) -> None:
-        assert 0 <= new_gcs_id <= 255
+        if not 0 <= new_gcs_id <= 255:
+            raise DroneInvalidParameterValueError("Value should be between 0-255")
         self._set_parameter(Parameter.SYSID_MYGCS, new_gcs_id)
 
     @property
@@ -135,7 +190,8 @@ class Drone:
 
     @fs_ekf_action.setter
     def fs_ekf_action(self, action: int) -> None:
-        assert 1 <= action <= 3
+        if not 1 <= action <= 3:
+            raise DroneInvalidParameterValueError("Value should be between 1-3")
         self._set_parameter(Parameter.FS_EKF_ACTION, action)
 
     @property
@@ -152,18 +208,22 @@ class Drone:
 
     @sim_rc_fail.setter
     def sim_rc_fail(self, value: bool) -> None:
+        if int(value) not in {0, 1}:
+            raise DroneInvalidParameterValueError("Value should be 0 or 1")
         self._set_parameter(Parameter.SIM_RC_FAIL, int(value))
 
     # ------------------- Messages -------------------
 
-    def get_gcs_heartbeat(self, blocking: bool = True):
+    def get_gcs_heartbeat(self, timeout_sec: float = 0):
         while (
-            heartbeat_message := self._receive_message(
-                message=Message.HEARTBEAT,
+            heartbeat_message := self._receive(
+                data_type=Message.HEARTBEAT,
                 blocking=True,
             )
         ) is not None:
-            self._log(f"Received heartbeat from {heartbeat_message.get_srcSystem()}: {heartbeat_message}")
+            self._log(
+                f"Received heartbeat from {heartbeat_message.get_srcSystem()}: {heartbeat_message}"
+            )
             my_gcs = self.get_parameter(Parameter.SYSID_MYGCS)
             self._log(f"My GCS: {my_gcs}")
             if heartbeat_message.get_srcSystem() == my_gcs:
@@ -173,12 +233,12 @@ class Drone:
     @property
     def gcs_heartbeat(self) -> Optional[mavlink.MAVLink_heartbeat_message]:
         return self.get_gcs_heartbeat(blocking=False)
-    
+
     def get_home_position(self, blocking: bool = True):
         """
         :return: Home drone position in SI units (meters, seconds, radians)
         """
-        position = self._receive_message(Message.HOME_POSITION, blocking=blocking)
+        position = self._receive(Message.HOME_POSITION, blocking=blocking)
         position.latitude = math.radians(position.latitude / 1e7)
         position.longitude = math.radians(position.longitude / 1e7)
         position.altitude /= 1e3
@@ -188,12 +248,12 @@ class Drone:
     @property
     def home_position(self) -> mavlink.MAVLink_home_position_message:
         return self.get_home_position(blocking=False)
-    
+
     def get_current_position(self, blocking: bool = True):
         """
         :return: Current drone position in SI units (meters, seconds, radians)
         """
-        position = self._receive_message(Message.GLOBAL_POSITION_INT, blocking=blocking)
+        position = self._receive(Message.GLOBAL_POSITION_INT, blocking=blocking)
         position.lat = math.radians(position.lat / 1e7)
         position.lon = math.radians(position.lon / 1e7)
         position.alt /= 1e1
@@ -208,23 +268,23 @@ class Drone:
     @property
     def current_position(self) -> mavlink.MAVLink_global_position_int_message:
         return self.get_current_position(blocking=False)
-    
+
     @property
     def attitude(self) -> mavlink.MAVLink_attitude_message:
-        return self._receive_message(Message.ATTITUDE)
+        return self._receive(Message.ATTITUDE)
 
     @property
     def local_position(self) -> mavlink.MAVLink_local_position_ned_message:
         """Local position and speed in north(x)-east(y)-down(z) convention"""
-        return self._receive_message(Message.LOCAL_POSITION_NED)
+        return self._receive(Message.LOCAL_POSITION_NED)
 
     @property
     def gps_raw(self) -> mavlink.MAVLink_gps_raw_int_message:
-        return self._receive_message(Message.GPS_RAW_INT)
+        return self._receive(Message.GPS_RAW_INT)
 
     @property
     def sim_state(self) -> mavlink.MAVLink_sim_state_message:
-        return self._receive_message(Message.SIM_STATE)
+        return self._receive(Message.SIM_STATE)
 
     @property
     def armed(self) -> bool:
@@ -266,9 +326,7 @@ class Drone:
 
     @property
     def mode(self) -> str:
-        heartbeat: mavlink.MAVLink_heartbeat_message = self._receive_message(
-            Message.HEARTBEAT
-        )
+        heartbeat: mavlink.MAVLink_heartbeat_message = self._receive(Message.HEARTBEAT)
         return mavutil.mode_string_v10(heartbeat)
 
     @mode.setter
@@ -279,6 +337,8 @@ class Drone:
             mavlink.MAV_MODE_FLAG_CUSTOM_MODE_ENABLED,
             self._drone.mode_mapping()[mode.upper()],
         )
+
+        # ------------------- Commands -------------------
 
     def arm(self) -> None:
         print("Arming...")
@@ -357,54 +417,44 @@ class Drone:
             chan8_raw=0,
         )
 
-    def _receive_message(
-        self,
-        message: Union[Parameter, Message] = None,
-        condition: Optional[str] = None,
-        blocking: bool = True,
-        timeout: Optional[float] = MESSAGE_RECEIVE_TIMEOUT_SEC,
-    ) -> mavlink.MAVLink_message:
-        """Returns the latest message available. If there is no latest message, waits for one."""
-        self._log(f"Receiving {repr(message)} ...")
-        if isinstance(message, Message):
-            self.update()
-        elif isinstance(message, Parameter):
-            self._request_parameter(message)
-        # Todo: add timeout and check with tests.
-        self._log(f"Attempt to receive: {message.name}")
-        return self._drone.recv_match(
-            condition=condition,
-            type=message.name,
-            blocking=blocking,
-            timeout=timeout,
-        )
+    def _new_data_since(self, data_name: str, base_time: float) -> MavlinkData:
+        if (
+            data_name in self._latest_mavlink_data
+            and (mavlink_data := self._latest_mavlink_data[data_name]).timestamp
+            > base_time
+        ):
+            return mavlink_data.message
 
-    def _receive_parameter(
+    def _receive(
         self,
-        parameter: Parameter,
-        timeout: float,
-    ) -> ParameterValue:
-        self._request_parameter(parameter)
-        end_time = time.time() + timeout
-        while (
-            param_value_message := self._drone.recv_match(
-                type=Message.PARAM_VALUE.name,
-                blocking=True,
-                timeout=end_time - time.time(),
+        data_type: Union[Message, Parameter],
+        timeout: Optional[float] = MESSAGE_RECEIVE_TIMEOUT_SEC,
+    ) -> Optional[mavlink.MAVLink_message]:
+        """Returns the latest message available. If there is no latest message, waits for one at the given timeout."""
+        COOLDOWN_SEC = 0.01
+        request_time = time.time()
+        data = self._new_data_since(data_name=data_type.name, base_time=request_time)
+        while self._time_since(request_time) < timeout and data is None:
+            self._wait(COOLDOWN_SEC)
+            data = self._new_data_since(
+                data_name=data_type.name, base_time=request_time
             )
-        ) is not None:
-            self._log(f"Received parameter: {param_value_message}")
-            if param_value_message.param_id == parameter.name:
-                return param_value_message
-        return None
+        return data
+
+    def get_message(self):
+        """Todo: set maximum of age"""
 
     def get_parameter(
         self, parameter: Parameter, timeout: float = PARAMETER_RECEIVE_TIMEOUT_SEC
-    ) -> Union[int, float]:
-        parameter_received: ParameterValue = self._receive_parameter(parameter, timeout)
-        if parameter_received is None:
-            return None
-        return parameter_received.param_value
+    ) -> Optional[float]:
+        # Todo: Add test for if the parameter was set, if it did - do nt request
+        self._request_parameter(parameter)
+        parameter_message: Optional[
+            mavlink.MAVLink_param_value_message
+        ] = self._receive(data_type=parameter, timeout=timeout)
+        if parameter_message is not None:
+            return parameter_message.param_value
+        return None
 
     def _command_int_send(
         self,
@@ -464,6 +514,7 @@ class Drone:
 
     def _set_parameter(self, parameter: Parameter, value) -> None:
         # Request the parameter
+        self._log(f"Setting {repr(parameter)} to be {value}")
         self._drone.mav.param_set_send(
             self._drone.target_system,
             self._drone.target_component,
