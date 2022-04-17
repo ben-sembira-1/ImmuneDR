@@ -1,3 +1,4 @@
+import itertools
 import math
 from typing import Optional, NamedTuple
 import time
@@ -16,6 +17,16 @@ class Position(NamedTuple):
     latitude: float
     longitude: float
     altitude: float
+
+
+DR_DIRECTION_TEST_PARAMETERS = [
+    parameters
+    for parameters in itertools.product(
+        [config.DR_AXIS_DISTANCE_DEGREES, -config.DR_AXIS_DISTANCE_DEGREES, 0],
+        repeat=2,
+    )
+    if parameters != (0, 0)
+]
 
 
 class TestDr:
@@ -235,13 +246,11 @@ class TestDr:
     # ----------------------------- Tests -----------------------------
 
     @pytest.mark.system
-    @pytest.mark.skip(reason="Tested")
     def test_simulation_not_crashing_on_startup(self, simulation: subprocess.Popen):
         utils.wait(10, absolute=True)
         assert simulation.poll() is None, "Simulation crashed"
 
     @pytest.mark.system
-    @pytest.mark.skip(reason="Tested")
     def test_drone_takeoff(self, flying_drone: drone_controller.Drone):
         assert flying_drone.armed, "The drone failed to takeoff, it is not armed"
         assert (
@@ -251,20 +260,10 @@ class TestDr:
         ), "The drone failed to takeoff, its heigt is wrong."
 
     @pytest.mark.system
-    @pytest.mark.skip(reason="WIP")
     @pytest.mark.parametrize(
-        "offset_latitude",
-        [config.DR_AXIS_DISTANCE_DEGREES, -config.DR_AXIS_DISTANCE_DEGREES, 0],
+        "offset_latitude, offset_longitude",
+        DR_DIRECTION_TEST_PARAMETERS,
     )
-    @pytest.mark.parametrize(
-        "offset_longitude",
-        [config.DR_AXIS_DISTANCE_DEGREES, -config.DR_AXIS_DISTANCE_DEGREES, 0],
-    )
-    # Use this and comment the 2 above markers for a single test:
-    # @pytest.mark.parametrize(
-    #     "offset_latitude, offset_longitude",
-    #     [(config.DR_AXIS_DISTANCE_DEGREES, config.DR_AXIS_DISTANCE_DEGREES)],
-    # )
     def test_dr_direction(
         self,
         flying_drone: drone_controller.Drone,
@@ -275,8 +274,6 @@ class TestDr:
         Test DR for when the home is configured to be in the
         given offsets from the initial drone position.
         """
-        if offset_latitude == 0 and offset_longitude == 0:
-            return
         new_home_position = self.set_home(
             flying_drone,
             offset_latitude,
@@ -306,7 +303,6 @@ class TestDr:
             )
 
     @pytest.mark.system
-    # @pytest.mark.skip(reason="WIP")
     def test_dr_trigger_rc_failure_then_gps_failure(
         self, flying_drone: drone_controller.Drone
     ):

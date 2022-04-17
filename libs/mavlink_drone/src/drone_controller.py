@@ -581,9 +581,9 @@ class Drone:
         COOLDOWN_SEC = 0.01
         while not self._kill_recv_thread:
             if (new_message := self._drone.recv_match(blocking=False)) is not None:
-                self._log(
-                    f"Received new mavlink packet (type: {new_message.get_type()}): {repr(new_message)}"
-                )
+                # self._log(
+                #     f"Received new mavlink packet (type: {new_message.get_type()}): {repr(new_message)}"
+                # )
                 new_message: mavlink.MAVLink_message
                 new_mavlink_data = MavlinkData(
                     message=new_message, timestamp=time.time()

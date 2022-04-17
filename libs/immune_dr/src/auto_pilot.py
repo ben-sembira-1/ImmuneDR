@@ -139,26 +139,24 @@ class AutoPilot:
                 ).yaw % (2 * math.pi)
                 self._log(f"current compass bearing: {current_yaw_compass_bearing}")
                 d_angle = self._home_compass_bearing - current_yaw_compass_bearing
-                pitch_rc = 0
                 yaw_rc = 0
                 self._log(f"Delta angle: {d_angle}")
 
-                if math.fabs(d_angle) > math.pi * 0.02:
+                if math.fabs(d_angle) > math.pi * 1e-2:
                     # If the home bearing is bigger, it means that we need to go clockwise to get to it, else counter-clockwise.
                     # If the delta angle is bigger then PI (more then half circle) it means that going to the other direction will be shorter.
                     yaw_rc = math.copysign(
                         AutoPilot.NO_GPS_DR_YAW,
                         (d_angle) * (math.pi - math.fabs(d_angle)),
                     )
-
-                if math.fabs(d_angle) < math.pi * 0.05:
+                if math.fabs(d_angle) < math.pi * 2e-1:
                     # Soft the yawing if close to the correct angle
                     yaw_rc /= 2
+                if math.fabs(d_angle) < math.pi * 2e-2:
                     angle_good_streak += 1
                 else:
                     angle_good_streak = 0
-                if angle_good_streak > 15:
-                    pitch_rc = -AutoPilot.NO_GPS_DR_PITCH
+                pitch_rc = -AutoPilot.NO_GPS_DR_PITCH if angle_good_streak > 15 else 0
                 self._next_rc_commands = (pitch_rc, 0, yaw_rc, 0)
             else:
                 self._next_rc_commands = None
@@ -166,7 +164,6 @@ class AutoPilot:
     def _rout_send_rc_commands(self):
         while True:
             yield
-            self._log("Sending RC commands")
             if self._next_rc_commands is not None:
                 self._drone.rc(*self._next_rc_commands)
                 self._log(f"Sending RC commands: {self._next_rc_commands}")
