@@ -26,7 +26,7 @@ RUN cd /ardupilot \
     && ./waf copter
 
 RUN sudo apt-get install -y python3-dev
-RUN sudo apt-get install -y python3-opencv
+# RUN sudo apt-get install -y python3-opencv
 RUN sudo apt-get install -y python3-wxgtk4.0
 RUN sudo apt-get install -y python3-pip
 RUN sudo apt-get install -y python3-matplotlib
