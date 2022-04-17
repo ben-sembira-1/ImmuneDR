@@ -142,7 +142,7 @@ class Drone:
         if isinstance(parameter, str):
             parameter_name = parameter
         elif isinstance(parameter, Parameter):
-            parameter_name = parameter_name.name
+            parameter_name = parameter.name
         else:
             raise TypeError(
                 f"The parameter should be a string or Parameter, but it is: {type(parameter)}."
@@ -222,6 +222,7 @@ class Drone:
         self.set_parameter(Parameter.SIM_RC_FAIL, int(value))
 
     def _new_heartbeat_since(self, system_id: int, max_age: float):
+        self._log(f"Checking for heartbeat from {system_id} of max age: {max_age} in: {self._latest_heartbeats}")
         if (
             system_id in self._latest_heartbeats
             and self._time_since(self._latest_heartbeats[system_id].timestamp) < max_age
@@ -334,7 +335,7 @@ class Drone:
 
     @property
     def armed(self) -> bool:
-        return self.get_gcs_heartbeat() and self._drone.motors_armed()
+        return (self._new_heartbeat_since(system_id=self._drone.target_system, max_age=Drone.GET_HEARTBEAT_MAX_AGE_SEC) and self._drone.motors_armed())
 
     @property
     def mode(self) -> str:
@@ -345,7 +346,7 @@ class Drone:
 
     @mode.setter
     def mode(self, mode: str) -> None:
-        print(f"Setting mode to {mode.upper()}...")
+        self._log(f"Setting mode to {mode.upper()}...")
         self._drone.mav.set_mode_send(
             self._drone.target_system,
             mavlink.MAV_MODE_FLAG_CUSTOM_MODE_ENABLED,
@@ -355,7 +356,7 @@ class Drone:
     # ------------------- Commands -------------------
 
     def arm(self) -> None:
-        print("Arming...")
+        self._log("Arming...")
         self._command_long_send(
             command_id=mavlink.MAV_CMD_COMPONENT_ARM_DISARM, param1=1, param2=0
         )
@@ -363,7 +364,7 @@ class Drone:
     def takeoff(self, height: int) -> None:
         if height <= 0:
             raise DroneTakeoffInvalidHeightError()
-        print(f"Taking off to {height}...")
+        self._log(f"Taking off to {height}...")
         self._command_long_send(command_id=mavlink.MAV_CMD_NAV_TAKEOFF, param7=height)
 
     def rotate_to(self, angle: int, rotation_speed: int = 10) -> None:
@@ -377,7 +378,7 @@ class Drone:
         if self._drone.flightmode != "GUIDED":
             raise DroneConditionYawWithoutGuidedModeError()
 
-        print(f"Rotating to {angle}...")
+        self._log(f"Rotating to {angle}...")
         self._command_long_send(
             command_id=mavlink.MAV_CMD_CONDITION_YAW,
             param1=angle,
@@ -558,20 +559,20 @@ class Drone:
         COOLDOWN_SEC = 0.01
         while not self._kill_recv_thread:
             if (new_message := self._drone.recv_match(blocking=False)) is not None:
+                # self._log(f"Received new mavlink packet: {repr(new_message)}")
                 new_message: mavlink.MAVLink_message
                 new_mavlink_data = MavlinkData(
                     message=new_message, timestamp=time.time()
                 )
                 self._latest_mavlink_data[new_message.get_type()] = new_mavlink_data
-                self._log(f"Recieved message: {new_message.get_type()}")
                 if new_message.get_type() == Message.PARAM_VALUE.name:
                     new_message: mavlink.MAVLink_param_value_message
                     self._latest_mavlink_data[new_message.param_id] = new_mavlink_data
-                    self._log(f"Received parameter: {new_message.param_id}")
+                    # self._log(f"Received parameter: {new_message.param_id}")
                 if new_message.get_type() == Message.HEARTBEAT.name:
                     self._latest_heartbeats[
-                        new_message.get_srcSystem
+                        new_message.get_srcSystem()
                     ] = new_mavlink_data
             else:
                 self._wait(COOLDOWN_SEC)
-                self._log("Cooling down")
+                # self._log("Cooling down")
