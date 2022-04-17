@@ -17,6 +17,7 @@ def simulation() -> subprocess.Popen:
     mavproxy_args = [
         f'--cmd="set heartbeat {2 * config.SPEED_UP}"',
         f"--out={config.TESTS_ADDRESS}",
+        f"--master={config.SITL_ADDRESS}",
         # f"--out=udp:localhost:{config.MISSION_PLANNER_PORT}",
     ]
     sitl_cmd = [
@@ -38,6 +39,7 @@ def simulation() -> subprocess.Popen:
     )
     yield sitl
     sitl.send_signal(signal.SIGINT)
+    sitl.communicate()
 
 @pytest.fixture
 def drone() -> drone_controller.Drone:

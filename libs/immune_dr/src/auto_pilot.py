@@ -32,7 +32,6 @@ class AutoPilot:
 
         self._drone = drone
         self._drone.request_all_messages()
-        self._drone.update()
         # Auto navigation with GPS
         self._waypoints = queue.Queue
         # Auto navigation no GPS
@@ -59,7 +58,6 @@ class AutoPilot:
         """
         Adds all the routines to the loop and starts it.
         """
-        self._loop.add_routine(self._rout_receive_updated_mavlink_messages())
         self._loop.add_routine(self._rout_check_failsafes())
         self._loop.add_routine(self._rout_enable_dr_if_needed())
         self._loop.add_routine(self._rout_update_home_compass_bearing())
@@ -78,12 +76,6 @@ class AutoPilot:
                 f"[{self._counter:03d} :: +{time.time() - self._start_time:.3f}] {message}"
             )
 
-    def _rout_receive_updated_mavlink_messages(self):
-        while True:
-            yield
-            self._log("Updating mavlink")
-            self._drone.update()
-
     def _rout_check_failsafes(self):
         while True:
             yield
@@ -92,7 +84,7 @@ class AutoPilot:
                 mavlink.GPS_FIX_TYPE_NO_FIX,
                 mavlink.GPS_FIX_TYPE_NO_GPS,
             }
-            if self._drone.gcs_heartbeat is None:
+            if self._drone.get_gcs_heartbeat() is None:
                 self._gcs_loss_counter += 1
             else:
                 self._gcs_loss_counter = 0

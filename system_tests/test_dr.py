@@ -68,14 +68,14 @@ class TestDr:
                 latitude=latitude, longitude=longitude, altitude=new_altitude
             )
         else:
-            current_location = drone_obj.get_current_position(blocking=True)
+            current_location = drone_obj.current_position
             new_home_position = Position(
                 latitude=current_location.lat + latitude,
                 longitude=current_location.lon + longitude,
                 altitude=new_altitude,
             )
 
-        drone_obj.set_home(position_radians_meters=new_home_position)
+        drone_obj.home_position = new_home_position
         if validation_timeout is not None:
             start_time = time.time()
             current_home_position = drone_obj.get_home_position(blocking=True)
@@ -231,13 +231,13 @@ class TestDr:
     # ----------------------------- Tests -----------------------------
 
     @pytest.mark.system
-    @pytest.mark.skip(reason="Tested")
+    # @pytest.mark.skip(reason="Tested")
     def test_simulation_not_crashing_on_startup(self, simulation: subprocess.Popen):
         utils.wait(10, absolute=True)
         assert simulation.poll() is None, "Simulation crashed"
 
     @pytest.mark.system
-    @pytest.mark.skip(reason="Tested")
+    # @pytest.mark.skip(reason="Tested")
     def test_drone_takeoff(self, flying_drone: drone_controller.Drone):
         assert flying_drone.armed, "The drone failed to takeoff, it is not armed"
         assert (
@@ -247,7 +247,7 @@ class TestDr:
         ), "The drone failed to takeoff, its heigt is wrong."
 
     @pytest.mark.system
-    @pytest.mark.skip(reason="WIP")
+    # @pytest.mark.skip(reason="WIP")
     # @pytest.mark.parametrize(
     #     "offset_latitude",
     #     [config.DR_AXIS_DISTANCE_DEGREES, -config.DR_AXIS_DISTANCE_DEGREES, 0],
@@ -304,7 +304,7 @@ class TestDr:
             )
 
     @pytest.mark.system
-    @pytest.mark.skip(reason="WIP")
+    # @pytest.mark.skip(reason="WIP")
     def test_dr_trigger_rc_failure_then_gps_failure(
         self, flying_drone: drone_controller.Drone
     ):
