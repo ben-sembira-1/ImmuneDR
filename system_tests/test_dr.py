@@ -34,6 +34,7 @@ class TestDr:
             (simulation_lat, simulation_lon),
             (home_position.latitude, home_position.longitude),
         )
+        print(f"Tests: Distance from home: {distance}")
         return distance
 
     def set_home(
@@ -61,7 +62,7 @@ class TestDr:
         if altitude is not None:
             new_altitude = altitude
         else:
-            new_altitude = drone_obj.get_home_position(blocking=True).altitude
+            new_altitude = drone_obj.home_position.altitude
 
         if absolute:
             new_home_position = Position(
@@ -78,7 +79,7 @@ class TestDr:
         drone_obj.home_position = new_home_position
         if validation_timeout is not None:
             start_time = time.time()
-            current_home_position = drone_obj.get_home_position(blocking=True)
+            current_home_position = drone_obj.home_position
             while (
                 math.fabs(current_home_position.latitude - new_home_position.latitude)
                 > config.FLOAT_ERROR
@@ -91,7 +92,7 @@ class TestDr:
                     utils.time_since(start_time) < validation_timeout
                 ), f"set_home validation failed, current: {current_home_position}, updated: {new_home_position}"
                 utils.wait(1)
-                current_home_position = drone_obj.get_home_position(blocking=True)
+                current_home_position = drone_obj.home_position
         return new_home_position
 
     def got_closer(
@@ -123,7 +124,6 @@ class TestDr:
         start_time = time.time()
         previous_distance = math.inf
         current_distance = self.distance_from_home(drone_obj, home_position)
-
         if percision_meters is None:
             percision_meters = (
                 current_distance * config.DR_PERCISION_METERS_PER_DISTANCE
@@ -132,7 +132,6 @@ class TestDr:
             timeout = current_distance * config.DR_TIMEOUT_SECONDS_PER_METER
 
         not_propegating_counter = 0
-
         while current_distance > percision_meters:
             if (
                 timeout >= 0
@@ -247,7 +246,7 @@ class TestDr:
         ), "The drone failed to takeoff, its heigt is wrong."
 
     @pytest.mark.system
-    @pytest.mark.skip(reason="WIP")
+    # @pytest.mark.skip(reason="WIP")
     # @pytest.mark.parametrize(
     #     "offset_latitude",
     #     [config.DR_AXIS_DISTANCE_DEGREES, -config.DR_AXIS_DISTANCE_DEGREES, 0],
@@ -287,7 +286,7 @@ class TestDr:
                 flying_drone.mode == "GUIDED"
             ), "Something wrong happend, the drone is not in GUIDED mode"
             # Let the autopilot get the drone position before we disable it.
-            utils.wait(60, absolute=True)
+            utils.wait(2)
             flying_drone.sim_gps_disable = True
             self.wait_for_mode_change(
                 drone_obj=flying_drone,

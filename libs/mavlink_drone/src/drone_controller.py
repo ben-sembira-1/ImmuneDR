@@ -73,8 +73,8 @@ class MavlinkData(NamedTuple):
 
 class Drone:
     MAX_SET_PARAMETER_ACK_TIMEOUT = 2e-1
-    DEFAULT_GET_MESSAGE_MAX_AGE_SEC = 1
-    MESSAGE_RECEIVE_TIMEOUT_SEC = 2
+    DEFAULT_GET_MESSAGE_MAX_AGE_SEC = 4e-1
+    DEFAULT_GET_MESSAGE_TIMEOUT_SEC = 2e-1
     GET_PARAMETER_MAX_AGE_SEC = 1e-1
     GET_HEARTBEAT_MAX_AGE_SEC = 2
     PARAMETER_RECEIVE_TIMEOUT_SEC = 1
@@ -84,12 +84,14 @@ class Drone:
         source_system_id: int,
         source_component_id: int = mavlink.MAV_COMP_ID_AUTOPILOT1,
         print_logs: bool = False,
+        simulation_speedup: float = 1,
     ):
         assert 0 < source_system_id < 255
         assert 0 < source_component_id < 255
         self.source_system_id = source_system_id
         self.source_component_id = source_component_id
         self._print_logs = print_logs
+        self._simulation_speedup = simulation_speedup
         # Todo: add simuation speedup parameter for effective testing.
         self._boot_time_sec: float = time.time()
         self._drone: Optional[mavutil.mavfile] = None
@@ -171,8 +173,8 @@ class Drone:
         max_age: float = GET_PARAMETER_MAX_AGE_SEC,
     ) -> Optional[float]:
         # Todo: Add test for if the parameter was set, if it did - do not request
-        if data := self._new_data_since(
-            data_name=parameter.name, base_time=time.time() - max_age
+        if data := self._new_data(
+            data_name=parameter.name, max_age=max_age
         ):
             data: Optional[mavlink.MAVLink_param_value_message]
             return data.param_value
@@ -221,15 +223,6 @@ class Drone:
             raise DroneInvalidParameterValueError("Value should be 0 or 1")
         self.set_parameter(Parameter.SIM_RC_FAIL, int(value))
 
-    def _new_heartbeat_since(self, system_id: int, max_age: float):
-        self._log(f"Checking for heartbeat from {system_id} of max age: {max_age} in: {self._latest_heartbeats}")
-        if (
-            system_id in self._latest_heartbeats
-            and self._time_since(self._latest_heartbeats[system_id].timestamp) < max_age
-        ):
-            return self._latest_heartbeats[system_id].message
-        return None
-
     # ------------------- Messages -------------------
 
     def request_all_messages(self) -> None:
@@ -238,10 +231,14 @@ class Drone:
             self._request_message_interval(message_id=message, interval=4e5)
 
     def get_message(
-        self, message: Union[str, Message], age: float = DEFAULT_GET_MESSAGE_MAX_AGE_SEC
+        self,
+        message: Union[str, Message],
+        max_age: float = DEFAULT_GET_MESSAGE_MAX_AGE_SEC,
+        timeout: float = DEFAULT_GET_MESSAGE_TIMEOUT_SEC,
     ):
         """Returns the latest message of the kind specified.
         If there is no message with age smaller then the age specified, return None."""
+        CHECK_MESSAGE_AGAIN_COOLDOWN_SEC = 1e-1
         if isinstance(message, Message):
             message_name = message.name
         elif isinstance(message, str):
@@ -250,12 +247,17 @@ class Drone:
             raise TypeError(
                 f"Excepted message of type Message or str, got {type(message)}"
             )
-        return self._new_data_since(data_name=message_name, base_time=time.time() - age)
+        start_time = time.time()
+        message = self._new_data(data_name=message_name, max_age=max_age)
+        while message is None and self._time_since(start_time) < timeout:
+            self._wait(CHECK_MESSAGE_AGAIN_COOLDOWN_SEC)
+            message = self._new_data(data_name=message_name, max_age=max_age)
+        return message
 
     def get_gcs_heartbeat(
         self, max_age: float = GET_HEARTBEAT_MAX_AGE_SEC
     ) -> Optional[mavlink.MAVLink_heartbeat_message]:
-        return self._new_heartbeat_since(system_id=self.sysid_mygcs, max_age=max_age)
+        return self._new_heartbeat(system_id=self.sysid_mygcs, max_age=max_age)
 
     @property
     def home_position(self) -> mavlink.MAVLink_home_position_message:
@@ -335,11 +337,17 @@ class Drone:
 
     @property
     def armed(self) -> bool:
-        return (self._new_heartbeat_since(system_id=self._drone.target_system, max_age=Drone.GET_HEARTBEAT_MAX_AGE_SEC) and self._drone.motors_armed())
+        return (
+            self._new_heartbeat(
+                system_id=self._drone.target_system,
+                max_age=Drone.GET_HEARTBEAT_MAX_AGE_SEC,
+            )
+            and self._drone.motors_armed()
+        )
 
     @property
     def mode(self) -> str:
-        heartbeat: mavlink.MAVLink_heartbeat_message = self._new_heartbeat_since(
+        heartbeat: mavlink.MAVLink_heartbeat_message = self._new_heartbeat(
             system_id=self._drone.target_system, max_age=Drone.GET_HEARTBEAT_MAX_AGE_SEC
         )
         return mavutil.mode_string_v10(heartbeat)
@@ -437,8 +445,8 @@ class Drone:
     def _receive(
         self,
         data_type: Union[Message, Parameter],
-        timeout: Optional[float],
-        age: float = 0,
+        timeout: float = 0,
+        max_age: float = 0,
     ) -> Optional[mavlink.MAVLink_message]:
         """
         Returns the latest message available of maximum age.
@@ -448,13 +456,11 @@ class Drone:
         """
         COOLDOWN_SEC = 0.01
         request_time = time.time()
-        data = self._new_data_since(
-            data_name=data_type.name, base_time=request_time - age
-        )
+        data = self._new_data(data_name=data_type.name, max_age=max_age, basetime=request_time)
         while self._time_since(request_time) < timeout and data is None:
             self._wait(COOLDOWN_SEC)
-            data = self._new_data_since(
-                data_name=data_type.name, base_time=request_time - age
+            data = self._new_data(
+                data_name=data_type.name, max_age=max_age, basetime=request_time
             )
         return data
 
@@ -538,20 +544,35 @@ class Drone:
             print(f"[+{time.time() - self._boot_time_sec:.3f}] {message}")
 
     def _wait(self, time_sec: float):
-        # Todo: In the future this will enable simulation speedup.
-        time.sleep(time_sec)
+        time.sleep(time_sec / self._simulation_speedup)
 
     def _time_since(self, base_time_sec: float):
-        # Todo: In the future this will enable simulation speedup.
-        return time.time() - base_time_sec
+        return (time.time() - base_time_sec) * self._simulation_speedup
 
     # ------------------- Mavlink listener -------------------
 
-    def _new_data_since(self, data_name: str, base_time: float) -> MavlinkData:
+    def _new_heartbeat(self, system_id: int, max_age: float, basetime: Optional[float] = None):
+        if basetime is None:
+            basetime = time.time()
+        self._log(
+            f"Checking for heartbeat from {system_id} of max age: {max_age} in: {self._latest_heartbeats}"
+        )
+        if (
+            system_id in self._latest_heartbeats
+            and self._time_since(self._latest_heartbeats[system_id].timestamp) < self._time_since(basetime - max_age)
+        ):
+            return self._latest_heartbeats[system_id].message
+        return None
+
+    def _new_data(self, data_name: str, max_age: float, basetime: Optional[float] = None) -> MavlinkData:
+        if basetime is None:
+            basetime = time.time()
         if (
             data_name in self._latest_mavlink_data
-            and (mavlink_data := self._latest_mavlink_data[data_name]).timestamp
-            > base_time
+            and self._time_since(
+                (mavlink_data := self._latest_mavlink_data[data_name]).timestamp
+            )
+            < self._time_since(basetime - max_age)
         ):
             return mavlink_data.message
 

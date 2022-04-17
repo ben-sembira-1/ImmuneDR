@@ -41,10 +41,12 @@ def simulation() -> subprocess.Popen:
     sitl.send_signal(signal.SIGINT)
     sitl.communicate()
 
+
 @pytest.fixture
 def drone() -> drone_controller.Drone:
     my_drone = drone_controller.Drone(
         source_system_id=config.MISSION_COMPUTER_MAVLINK_SYSTEM_ID,
-        print_logs=True
+        print_logs=True,
+        simulation_speedup=config.SPEED_UP,
     )
     return my_drone

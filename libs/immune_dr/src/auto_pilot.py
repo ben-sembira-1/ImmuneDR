@@ -6,7 +6,7 @@ from typing import Tuple, Optional
 from pymavlink import mavlink
 
 from libs.immune_dr.src import hz_loop, geo_misc
-from libs.mavlink_drone.src.drone_controller import Drone
+from libs.mavlink_drone.src import drone_controller
 
 
 class AutoPilot:
@@ -24,7 +24,7 @@ class AutoPilot:
     ]
 
     def __init__(
-        self, drone: Drone, print_logs: bool = False, simulation_speedup: float = 1.0
+        self, drone: drone_controller.Drone, print_logs: bool = False, simulation_speedup: float = 1.0
     ):
         self._loop = hz_loop.HzLoop(2 * simulation_speedup)
         self._print_logs = print_logs
@@ -123,6 +123,7 @@ class AutoPilot:
                 )
                 self._log(f"home compass bearing: {self._home_compass_bearing}")
                 self._log(f"home position: {self._home_position}")
+                self._log(f"last position: {self._last_position}")
 
     def _rout_update_rc_commands(self):
         angle_good_streak = 0
@@ -135,7 +136,7 @@ class AutoPilot:
                 #  program will manage to override the RC commands,
                 #  the vehicle will be set on LAND mode.
                 #  self._drone.set_mode("ALT_HOLD")
-                current_yaw_compass_bearing = self._drone.attitude.yaw % (2 * math.pi)
+                current_yaw_compass_bearing = self._drone.get_message(drone_controller.Message.ATTITUDE, max_age = 1e-1, timeout=5e-1).yaw % (2 * math.pi)
                 self._log(f"current compass bearing: {current_yaw_compass_bearing}")
                 d_angle = self._home_compass_bearing - current_yaw_compass_bearing
                 pitch_rc = 0
