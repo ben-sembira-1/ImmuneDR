@@ -59,6 +59,8 @@ class TestDr:
 
         The function returns the new home location.
         """
+
+        # drone.set_home(drone.home_position + DeltaPos(long=300, lat=100))
         if altitude is not None:
             new_altitude = altitude
         else:
@@ -190,7 +192,9 @@ class TestDr:
     # ----------------------------- Fixtures -----------------------------
 
     @pytest.fixture
-    def flying_drone(self, simulation: subprocess.Popen, drone: drone_controller.Drone) -> drone_controller.Drone:
+    def flying_drone(
+        self, simulation: subprocess.Popen, drone: drone_controller.Drone
+    ) -> drone_controller.Drone:
         TestDr.current_simulation = simulation
         drone.connect(
             address=config.TESTS_ADDRESS,
@@ -198,9 +202,10 @@ class TestDr:
         )
         drone.run()
         start_time = time.time()
+
         def time_valid() -> bool:
             return utils.time_since(start_time) < config.INITIALIZATION_TIMEOUT_SEC
-        
+
         last_gps_raw = drone.gps_raw
         while time_valid() and (
             last_gps_raw is None
@@ -246,20 +251,20 @@ class TestDr:
         ), "The drone failed to takeoff, its heigt is wrong."
 
     @pytest.mark.system
-    # @pytest.mark.skip(reason="WIP")
-    # @pytest.mark.parametrize(
-    #     "offset_latitude",
-    #     [config.DR_AXIS_DISTANCE_DEGREES, -config.DR_AXIS_DISTANCE_DEGREES, 0],
-    # )
-    # @pytest.mark.parametrize(
-    #     "offset_longitude",
-    #     [config.DR_AXIS_DISTANCE_DEGREES, -config.DR_AXIS_DISTANCE_DEGREES, 0],
-    # )
-    # Use this and comment the 2 above markers for a single test:
+    @pytest.mark.skip(reason="WIP")
     @pytest.mark.parametrize(
-        "offset_latitude, offset_longitude",
-        [(config.DR_AXIS_DISTANCE_DEGREES, config.DR_AXIS_DISTANCE_DEGREES)],
+        "offset_latitude",
+        [config.DR_AXIS_DISTANCE_DEGREES, -config.DR_AXIS_DISTANCE_DEGREES, 0],
     )
+    @pytest.mark.parametrize(
+        "offset_longitude",
+        [config.DR_AXIS_DISTANCE_DEGREES, -config.DR_AXIS_DISTANCE_DEGREES, 0],
+    )
+    # Use this and comment the 2 above markers for a single test:
+    # @pytest.mark.parametrize(
+    #     "offset_latitude, offset_longitude",
+    #     [(config.DR_AXIS_DISTANCE_DEGREES, config.DR_AXIS_DISTANCE_DEGREES)],
+    # )
     def test_dr_direction(
         self,
         flying_drone: drone_controller.Drone,
@@ -271,8 +276,6 @@ class TestDr:
         given offsets from the initial drone position.
         """
         if offset_latitude == 0 and offset_longitude == 0:
-            # This means that the drone is already at home.
-            # Todo: should it land in that case?
             return
         new_home_position = self.set_home(
             flying_drone,
@@ -303,7 +306,7 @@ class TestDr:
             )
 
     @pytest.mark.system
-    @pytest.mark.skip(reason="WIP")
+    # @pytest.mark.skip(reason="WIP")
     def test_dr_trigger_rc_failure_then_gps_failure(
         self, flying_drone: drone_controller.Drone
     ):
@@ -332,7 +335,7 @@ class TestDr:
                 drone_obj=flying_drone,
                 mode="ALT_HOLD",
             )
-            utils.wait(config.RTL_TO_ALTHOLD_STOP_TIME_SECONDS)
+            utils.wait(config.AIR_STOP_TIME_SECONDS)
             self.wait_for_dr_start(
                 drone_obj=flying_drone,
                 home_position=new_home_position,

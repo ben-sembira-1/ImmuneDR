@@ -15,16 +15,12 @@ class AutoPilot:
     NO_GPS_DR_PITCH = 1
     NO_GPS_DR_YAW = 0.1
     MAX_GCS_LOSSES = 3
-    # Todo: This may be removed.
-    MESSAGES_TO_REQUEST_INTERVAL = [
-        mavlink.MAVLINK_MSG_ID_HOME_POSITION,
-        mavlink.MAVLINK_MSG_ID_GLOBAL_POSITION_INT,
-        mavlink.MAVLINK_MSG_ID_ATTITUDE,
-        mavlink.MAVLINK_MSG_ID_GPS_RAW_INT,
-    ]
 
     def __init__(
-        self, drone: drone_controller.Drone, print_logs: bool = False, simulation_speedup: float = 1.0
+        self,
+        drone: drone_controller.Drone,
+        print_logs: bool = False,
+        simulation_speedup: float = 1.0,
     ):
         self._loop = hz_loop.HzLoop(2 * simulation_speedup)
         self._print_logs = print_logs
@@ -60,6 +56,7 @@ class AutoPilot:
         """
         self._loop.add_routine(self._rout_check_failsafes())
         self._loop.add_routine(self._rout_enable_dr_if_needed())
+        self._loop.add_routine(self._rout_change_mode_if_needed())
         self._loop.add_routine(self._rout_update_home_compass_bearing())
         self._loop.add_routine(self._rout_update_rc_commands())
         self._loop.add_routine(self._rout_send_rc_commands())
@@ -105,6 +102,12 @@ class AutoPilot:
                 self._drone.sysid_mygcs = self._drone.source_system_id
                 self._dr_active = True
 
+    def _rout_change_mode_if_needed(self):
+        while True:
+            yield
+            if self._dr_active and self._drone.mode == "LAND":
+                self._drone.mode = "ALT_HOLD"
+
     def _rout_update_home_compass_bearing(self):
         new_position = False
         while True:
@@ -131,12 +134,9 @@ class AutoPilot:
             yield
             self._log("Updating RC commands")
             if self._dr_active:
-                # Todo: This needs to be done somewhere because
-                #  if the rc failsafe will take place before the
-                #  program will manage to override the RC commands,
-                #  the vehicle will be set on LAND mode.
-                #  self._drone.set_mode("ALT_HOLD")
-                current_yaw_compass_bearing = self._drone.get_message(drone_controller.Message.ATTITUDE, max_age = 1e-1, timeout=5e-1).yaw % (2 * math.pi)
+                current_yaw_compass_bearing = self._drone.get_message(
+                    drone_controller.Message.ATTITUDE, max_age=1e-1, timeout=5e-1
+                ).yaw % (2 * math.pi)
                 self._log(f"current compass bearing: {current_yaw_compass_bearing}")
                 d_angle = self._home_compass_bearing - current_yaw_compass_bearing
                 pitch_rc = 0

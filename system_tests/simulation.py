@@ -17,8 +17,7 @@ def simulation() -> subprocess.Popen:
     mavproxy_args = [
         f'--cmd="set heartbeat {2 * config.SPEED_UP}"',
         f"--out={config.TESTS_ADDRESS}",
-        f"--master={config.SITL_ADDRESS}",
-        # f"--out=udp:localhost:{config.MISSION_PLANNER_PORT}",
+        f"--out=udp:localhost:{config.MISSION_PLANNER_PORT}",
     ]
     sitl_cmd = [
         "python3",
@@ -37,9 +36,12 @@ def simulation() -> subprocess.Popen:
         stderr=subprocess.PIPE,
         stdin=subprocess.PIPE,
     )
-    yield sitl
-    sitl.send_signal(signal.SIGINT)
-    sitl.communicate()
+    try:
+        yield sitl
+    finally:
+        sitl.send_signal(signal.SIGINT)
+        # Wait for the simulation to close itself.
+        sitl.communicate()
 
 
 @pytest.fixture

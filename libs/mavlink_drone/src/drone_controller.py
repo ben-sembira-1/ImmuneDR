@@ -87,17 +87,16 @@ class Drone:
         print_logs: bool = False,
         simulation_speedup: float = 1,
     ):
-        assert 0 < source_system_id < 255
-        assert 0 < source_component_id < 255
+        assert 0 <= source_system_id <= 255
+        assert 0 <= source_component_id <= 255
         self.source_system_id = source_system_id
         self.source_component_id = source_component_id
         self._print_logs = print_logs
         self._simulation_speedup = simulation_speedup
-        # Todo: add simuation speedup parameter for effective testing.
         self._boot_time_sec: float = time.time()
         self._drone: Optional[mavutil.mavfile] = None
         self._latest_mavlink_data: Dict[str, MavlinkData] = {}
-        self._latest_heartbeats: Dict[str, MavlinkData] = {}
+        self._latest_heartbeats: Dict[int, MavlinkData] = {}
         self._recv_thread: threading.Thread = threading.Thread(
             target=self._thr_update_mavlink_messages_loop, daemon=True
         )

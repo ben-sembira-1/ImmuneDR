@@ -1,9 +1,9 @@
 # TODO
-1. Create a comparison document for dr techniqe
-2. Create test for dr without ekf, but with rc
-3. Create test for dr without rc but with ekf
-4. Create test for dr without rc and ekf
-5. Create Drone Package
-6. Disable auto-land in **EKF failure** and in **RC failure** such that the tests whould pass.
+- [ ] Create a docker file with all what is needed to use this.
+- [ ] Implement all empty tests
+- [ ] Make test speed up parameter be in one place (config.py, mav.parm)
+- [ ] Add tests to Drone class
+- [ ] Add a test for recieving the same message multiple times at short time.
+- [ ] Decide what to do in case of starting DR when the home location is very close.
 
 
