@@ -174,9 +174,7 @@ class Drone:
         max_age: float = GET_PARAMETER_MAX_AGE_SEC,
     ) -> Optional[float]:
         # Todo: Add test for if the parameter was set, if it did - do not request
-        if data := self._new_data(
-            data_name=parameter.name, max_age=max_age
-        ):
+        if data := self._new_data(data_name=parameter.name, max_age=max_age):
             data: Optional[mavlink.MAVLink_param_value_message]
             return data.param_value
         self._request_parameter(parameter)
@@ -458,7 +456,9 @@ class Drone:
         """
         COOLDOWN_SEC = 0.01
         request_time = time.time()
-        data = self._new_data(data_name=data_type.name, max_age=max_age, basetime=request_time)
+        data = self._new_data(
+            data_name=data_type.name, max_age=max_age, basetime=request_time
+        )
         while self._time_since(request_time) < timeout and data is None:
             self._wait(COOLDOWN_SEC)
             data = self._new_data(
@@ -553,29 +553,28 @@ class Drone:
 
     # ------------------- Mavlink listener -------------------
 
-    def _new_heartbeat(self, system_id: int, max_age: float, basetime: Optional[float] = None):
+    def _new_heartbeat(
+        self, system_id: int, max_age: float, basetime: Optional[float] = None
+    ):
         if basetime is None:
             basetime = time.time()
         self._log(
             f"Checking for heartbeat from {system_id} of max age: {max_age} in: {self._latest_heartbeats}"
         )
-        if (
-            system_id in self._latest_heartbeats
-            and self._time_since(self._latest_heartbeats[system_id].timestamp) < self._time_since(basetime - max_age)
-        ):
+        if system_id in self._latest_heartbeats and self._time_since(
+            self._latest_heartbeats[system_id].timestamp
+        ) < self._time_since(basetime - max_age):
             return copy.deepcopy(self._latest_heartbeats[system_id].message)
         return None
 
-    def _new_data(self, data_name: str, max_age: float, basetime: Optional[float] = None) -> MavlinkData:
+    def _new_data(
+        self, data_name: str, max_age: float, basetime: Optional[float] = None
+    ) -> MavlinkData:
         if basetime is None:
             basetime = time.time()
-        if (
-            data_name in self._latest_mavlink_data
-            and self._time_since(
-                (mavlink_data := self._latest_mavlink_data[data_name]).timestamp
-            )
-            < self._time_since(basetime - max_age)
-        ):
+        if data_name in self._latest_mavlink_data and self._time_since(
+            (mavlink_data := self._latest_mavlink_data[data_name]).timestamp
+        ) < self._time_since(basetime - max_age):
             return copy.deepcopy(mavlink_data.message)
         return None
 
@@ -583,7 +582,9 @@ class Drone:
         COOLDOWN_SEC = 0.01
         while not self._kill_recv_thread:
             if (new_message := self._drone.recv_match(blocking=False)) is not None:
-                self._log(f"Received new mavlink packet (type: {new_message.get_type()}): {repr(new_message)}")
+                self._log(
+                    f"Received new mavlink packet (type: {new_message.get_type()}): {repr(new_message)}"
+                )
                 new_message: mavlink.MAVLink_message
                 new_mavlink_data = MavlinkData(
                     message=new_message, timestamp=time.time()
