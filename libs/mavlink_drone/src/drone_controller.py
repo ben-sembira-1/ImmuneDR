@@ -3,6 +3,7 @@ import math
 import threading
 import time
 from typing import NamedTuple, Optional, Tuple, Union, Dict
+import copy
 
 from pymavlink import mavutil, mavlink
 from pytest import param
@@ -248,11 +249,11 @@ class Drone:
                 f"Excepted message of type Message or str, got {type(message)}"
             )
         start_time = time.time()
-        message = self._new_data(data_name=message_name, max_age=max_age)
-        while message is None and self._time_since(start_time) < timeout:
+        new_data = self._new_data(data_name=message_name, max_age=max_age)
+        while new_data is None and self._time_since(start_time) < timeout:
             self._wait(CHECK_MESSAGE_AGAIN_COOLDOWN_SEC)
-            message = self._new_data(data_name=message_name, max_age=max_age)
-        return message
+            new_data = self._new_data(data_name=message_name, max_age=max_age)
+        return new_data
 
     def get_gcs_heartbeat(
         self, max_age: float = GET_HEARTBEAT_MAX_AGE_SEC
@@ -262,6 +263,7 @@ class Drone:
     @property
     def home_position(self) -> mavlink.MAVLink_home_position_message:
         position = self.get_message(Message.HOME_POSITION)
+
         position.latitude = math.radians(position.latitude / 1e7)
         position.longitude = math.radians(position.longitude / 1e7)
         position.altitude /= 1e3
@@ -561,7 +563,7 @@ class Drone:
             system_id in self._latest_heartbeats
             and self._time_since(self._latest_heartbeats[system_id].timestamp) < self._time_since(basetime - max_age)
         ):
-            return self._latest_heartbeats[system_id].message
+            return copy.deepcopy(self._latest_heartbeats[system_id].message)
         return None
 
     def _new_data(self, data_name: str, max_age: float, basetime: Optional[float] = None) -> MavlinkData:
@@ -574,13 +576,14 @@ class Drone:
             )
             < self._time_since(basetime - max_age)
         ):
-            return mavlink_data.message
+            return copy.deepcopy(mavlink_data.message)
+        return None
 
     def _thr_update_mavlink_messages_loop(self):
         COOLDOWN_SEC = 0.01
         while not self._kill_recv_thread:
             if (new_message := self._drone.recv_match(blocking=False)) is not None:
-                # self._log(f"Received new mavlink packet: {repr(new_message)}")
+                self._log(f"Received new mavlink packet (type: {new_message.get_type()}): {repr(new_message)}")
                 new_message: mavlink.MAVLink_message
                 new_mavlink_data = MavlinkData(
                     message=new_message, timestamp=time.time()
