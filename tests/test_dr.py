@@ -218,7 +218,7 @@ def flying_drone(
         utils.wait(1)
         last_gps_raw = drone.gps_raw
     drone.mode = "GUIDED"
-    while time_valid() and (l := drone.local_position is None):
+    while time_valid() and ((l := drone.local_position) is None):
         utils.wait(1)
     drone.arm()
     drone.takeoff(config.FLIGHT_ALTITUDE_METERS)

@@ -39,8 +39,6 @@ RUN python3 ./waf configure && python3 ./waf copter
 
 WORKDIR /home/pilot
 
-RUN pip3 install pytest
-
 USER pilot
 WORKDIR /home/pilot/
 COPY --chown=pilot:pilot . ./app

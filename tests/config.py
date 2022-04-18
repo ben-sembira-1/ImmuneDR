@@ -7,8 +7,8 @@ SPEED_UP: int = 5
 
 SIM_VEHICLE_PATH = "/home/pilot/ardupilot/Tools/autotest/sim_vehicle.py"
 MISSION_PLANNER_PORT = 14580  # For future use
-TESTS_PORT = 5760
-SITL_PORT = 5760
+TESTS_PORT = 5762
+SITL_PORT = 5762
 TESTS_ADDRESS = f"tcp:localhost:{TESTS_PORT}"
 SITL_ADDRESS = f"tcp:localhost:{SITL_PORT}"
 SIMULATION_DIRECTORY_PATH = "simulation_directory"

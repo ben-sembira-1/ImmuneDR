@@ -1,4 +1,3 @@
-import time
 import subprocess
 from typing import Iterable
 
@@ -29,8 +28,10 @@ def connected_drone(
         connection_timeout_sec=config.DRONE_CONNECT_TO_SIMULATION_TIMEOUT_SEC,
     )
     drone.run()
-    yield drone
-    drone.stop()
+    try:
+        yield drone
+    finally:
+        drone.stop()
 
 
 @pytest.mark.system

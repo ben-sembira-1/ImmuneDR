@@ -11,6 +11,6 @@ setup(
         "pymavlink"
     ],
     extras_require= {
-        "test": "pytest"
+        "test": ["pytest", "pytest-repeat"]
     }
 )
