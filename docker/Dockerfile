@@ -41,5 +41,14 @@ WORKDIR /home/pilot
 
 RUN pip3 install pytest
 
-WORKDIR /home/pilot/app
-CMD "python3 -m pytest ."
+# WORKDIR /home/pilot/app
+# CMD "python3 -m pytest ."
+
+USER root
+RUN apt-get install xvfb
+RUN Xvfb :99 -screan 0 1280x1024x24 &
+ENV DISPLAY=99
+RUN xdpyinfo
+
+# RUN RESOLUTION=`xdpyinfo | grep -E "dimensions: *[0-9]+x[0-9]* pixels" --only-matching | grep -E "[0-9]+x[0-9]+" --only-matching` \
+#     && ffmpeg -f x11grab -framerate 5 -video_size $RESOLUTION -i :9.0 mp_recording.mp4
