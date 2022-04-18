@@ -5,6 +5,9 @@ EXTERNAL_GCS_PORT ?= 5763
 default_make:
 	echo "Please run a command."
 
+tests_shell:
+	docker run -it --rm -v $(shell pwd):/home/pilot/app -p 5763:${EXTERNAL_GCS_PORT} sitl bash
+
 build_sitl_docker:
 	docker build -t sitl --file=docker/Dockerfile .
 

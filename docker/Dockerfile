@@ -41,5 +41,9 @@ WORKDIR /home/pilot
 
 RUN pip3 install pytest
 
+USER pilot
+WORKDIR /home/pilot/
+COPY --chown=pilot:pilot . ./app
 WORKDIR /home/pilot/app
+RUN pip3 install -e .[test]
 CMD "python3 -m pytest ."
