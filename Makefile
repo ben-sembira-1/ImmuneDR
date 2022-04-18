@@ -1,7 +1,10 @@
 .DEFAULT_GOAL := default_make
 
 build_sitl_docker:
-	docker build --rm -t sitl --file=docker/Dockerfile .
+	docker build -t sitl --file=docker/Dockerfile .
+
+run_tests_in_docker:
+	docker run -it --rm -v $(shell pwd):/home/pilot/app sitl python3 -m pytest . --pdb
 
 default_make:
 	echo "Please run a command."

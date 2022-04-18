@@ -4,7 +4,7 @@ from typing import Optional, NamedTuple
 import time
 import pytest
 import subprocess
-from pymavlink import mavlink
+from pymavlink.dialects.v20 import ardupilotmega as mavlink
 
 from system_tests import config, utils
 

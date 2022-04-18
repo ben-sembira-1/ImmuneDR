@@ -1,36 +1,45 @@
-FROM ubuntu:18.04
+FROM ubuntu:20.04
 
-RUN mkdir /Drones
-RUN apt-get update \
-    && apt-get install -y python3.8 python3.8-dev python3-pip \
-    && cd /usr/local/bin \
-    && ln -s /usr/bin/python3 python \
-    && pip3 install --upgrade pip \
-    && cd /
-RUN apt-get install -y git
-RUN git clone https://github.com/ArduPilot/ardupilot.git /ardupilot 
-RUN python3 -m pip install pymavlink
+ENV TZ=Europe/Kiev
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
-RUN cd /ardupilot \
-    && git submodule update --init --recursive
-RUN apt-get install -y sudo
-# RUN useradd -ms /bin/bash user_not_root
-# RUN echo "user_not_root ALL=(ALL) NOPASSWD:/ardupilot/Tools/environment_install/install-prereqs-ubuntu.sh" >> /etc/sudoers
-# USER user_not_root
-# RUN cd /ardupilot \
-#     && Tools/environment_install/install-prereqs-ubuntu.sh -y
+RUN apt-get update -y && \
+    apt-get install -y tzdata  && \
+    apt-get install -y git python g++ ccache gawk make wget cmake python3-pip iproute2 python3-future libtool autoconf pkg-config ninja-build sudo
+
+
+RUN pip3 install meson==0.56
+
+RUN adduser --disabled-password --gecos '' pilot
+RUN adduser pilot sudo
+RUN echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
+USER pilot
+
+WORKDIR /home/pilot
+
+# Install mavlink router - will enable connecting with external ground station for debugging
+RUN git clone --recursive --depth 1 https://github.com/mavlink-router/mavlink-router.git
+WORKDIR /home/pilot/mavlink-router
+RUN meson setup build . -Dsystemdsystemunitdir=/usr/lib/systemd/system --buildtype=debugoptimized
 USER root
-RUN python3 -m pip install empy pexpect
-RUN cd /ardupilot \
-    && ./waf configure --board sitl \
-    && ./waf copter
+RUN ninja -C build install
+USER pilot
 
-RUN sudo apt-get install -y python3-dev
-# RUN sudo apt-get install -y python3-opencv
-RUN sudo apt-get install -y python3-wxgtk4.0
-RUN sudo apt-get install -y python3-pip
-RUN sudo apt-get install -y python3-matplotlib
-RUN sudo apt-get install -y python3-lxml
-RUN pip3 insatll pygame
-RUN pip3 install PyYAML mavproxy --user
-RUN echo "export PATH=$PATH:$HOME/.local/bin" >> ~/.bashrc
+
+# Install ardupilot
+WORKDIR /home/pilot
+
+RUN git clone --recursive --depth 1 https://github.com/ArduPilot/ardupilot.git
+WORKDIR /home/pilot/ardupilot
+RUN echo 'debconf debconf/frontend select Noninteractive' | sudo debconf-set-selections && \
+    sudo apt-get install -y -q keyboard-configuration
+
+RUN USER=pilot Tools/environment_install/install-prereqs-ubuntu.sh -y
+RUN python3 ./waf configure && python3 ./waf copter
+
+WORKDIR /home/pilot
+
+RUN pip3 install pytest
+
+WORKDIR /home/pilot/app
+CMD "python3 -m pytest ."

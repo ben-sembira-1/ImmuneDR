@@ -5,12 +5,12 @@ import math
 # For chaning the speedup, change the SIM_SPEEDUP in the system_tests/mav.param as well.
 SPEED_UP: int = 5
 
-SIM_VEHICLE_PATH = "/home/ben/clones/ardupilot/Tools/autotest/sim_vehicle.py"
+SIM_VEHICLE_PATH = "/home/pilot/ardupilot/Tools/autotest/sim_vehicle.py"
 MISSION_PLANNER_PORT = 14580  # For future use
-TESTS_PORT = 14570
-SITL_PORT = 14560
-TESTS_ADDRESS = f"udp:localhost:{TESTS_PORT}"
-SITL_ADDRESS = f"udp:localhost:{SITL_PORT}"
+TESTS_PORT = 5760
+SITL_PORT = 5760
+TESTS_ADDRESS = f"tcp:localhost:{TESTS_PORT}"
+SITL_ADDRESS = f"tcp:localhost:{SITL_PORT}"
 SIMULATION_DIRECTORY_PATH = "system_tests/simulation_directory"
 MAV_PARAM_FILE_PATH = "system_tests/mav.parm"
 MISSION_COMPUTER_MAVLINK_SYSTEM_ID = 2

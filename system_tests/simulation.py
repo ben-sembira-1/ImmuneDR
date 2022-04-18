@@ -14,20 +14,12 @@ def simulation() -> subprocess.Popen:
         shutil.rmtree(config.SIMULATION_DIRECTORY_PATH)
     os.makedirs(config.SIMULATION_DIRECTORY_PATH)
     shutil.copy2(config.MAV_PARAM_FILE_PATH, config.SIMULATION_DIRECTORY_PATH)
-    mavproxy_args = [
-        f'--cmd="set heartbeat {2 * config.SPEED_UP}"',
-        f"--out={config.TESTS_ADDRESS}",
-        f"--out=udp:localhost:{config.MISSION_PLANNER_PORT}",
-    ]
     sitl_cmd = [
-        "python3",
         config.SIM_VEHICLE_PATH,
         "-v",
         "ArduCopter",
-        f"--add-param-file=mav.parm",
-        f"--mavproxy-args={' '.join(mavproxy_args)}",
-        "--map",
-        "--console",
+        "--no-rebuild",
+        "--no-mavproxy",
     ]
     sitl = subprocess.Popen(
         sitl_cmd,
@@ -41,7 +33,7 @@ def simulation() -> subprocess.Popen:
     finally:
         sitl.send_signal(signal.SIGINT)
         # Wait for the simulation to close itself.
-        sitl.communicate()
+        print(sitl.communicate())
 
 
 @pytest.fixture

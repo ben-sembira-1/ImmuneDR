@@ -5,7 +5,8 @@ import time
 from typing import NamedTuple, Optional, Tuple, Union, Dict
 import copy
 
-from pymavlink import mavutil, mavlink
+from pymavlink import mavutil
+from pymavlink.dialects.v20 import ardupilotmega as mavlink
 from pytest import param
 
 

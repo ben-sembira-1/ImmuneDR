@@ -3,7 +3,7 @@ import queue
 import time
 from typing import Tuple, Optional
 
-from pymavlink import mavlink
+from pymavlink.dialects.v20 import ardupilotmega as mavlink
 
 from libs.immune_dr.src import hz_loop, geo_misc
 from libs.mavlink_drone.src import drone_controller
