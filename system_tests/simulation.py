@@ -8,7 +8,7 @@ from libs.mavlink_drone.src import drone_controller
 from system_tests import config
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def simulation() -> subprocess.Popen:
     if os.path.exists(config.SIMULATION_DIRECTORY_PATH):
         shutil.rmtree(config.SIMULATION_DIRECTORY_PATH)
@@ -18,6 +18,7 @@ def simulation() -> subprocess.Popen:
         config.SIM_VEHICLE_PATH,
         "-v",
         "ArduCopter",
+        "--add-param-file=mav.parm",
         "--no-rebuild",
         "--no-mavproxy",
     ]
@@ -36,8 +37,8 @@ def simulation() -> subprocess.Popen:
         print(sitl.communicate())
 
 
-@pytest.fixture
-def drone() -> drone_controller.Drone:
+@pytest.fixture(scope="function")
+def drone(simulation) -> drone_controller.Drone:
     my_drone = drone_controller.Drone(
         source_system_id=config.MISSION_COMPUTER_MAVLINK_SYSTEM_ID,
         print_logs=True,
