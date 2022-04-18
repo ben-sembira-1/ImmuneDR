@@ -3,7 +3,7 @@ from typing import Tuple
 
 import pytest
 
-from drones.immune_dr import geo_misc
+from drones import geo_misc
 
 @pytest.mark.parametrize(
     "point_from, point_to, expected_bearing",

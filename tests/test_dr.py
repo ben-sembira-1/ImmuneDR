@@ -8,9 +8,9 @@ from pymavlink.dialects.v20 import ardupilotmega as mavlink
 
 from . import config, utils
 
-from mavlink_drone import drone_controller
-from immune_dr import auto_pilot
-from immune_dr import geo_misc
+from drones import drone_controller
+from drones import auto_pilot
+from drones import geo_misc
 
 
 class Position(NamedTuple):
@@ -218,13 +218,13 @@ def flying_drone(
         utils.wait(1)
         last_gps_raw = drone.gps_raw
     drone.mode = "GUIDED"
-    while time_valid() and (drone.local_position is None):
+    while time_valid() and (l := drone.local_position is None):
         utils.wait(1)
     drone.arm()
     drone.takeoff(config.FLIGHT_ALTITUDE_METERS)
     # local_position.z returns negetive height (the z axis are flipped).
     while time_valid() and (
-        -1 * drone.local_position.z < config.FLIGHT_ALTITUDE_METERS - 2
+        -1 * l.z < config.FLIGHT_ALTITUDE_METERS - 2
     ):
         utils.wait(1)
     assert time_valid(), "Initialization timeout"

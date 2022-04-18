@@ -1,7 +1,5 @@
 import time
 
-from system_tests import config
-
 
 def wait(seconds: float, absolute: bool = False) -> None:
     if absolute:

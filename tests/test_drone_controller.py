@@ -5,7 +5,7 @@ from typing import Iterable
 import pytest
 
 from . import config, utils
-from mavlink_drone import drone_controller
+from drones import drone_controller
 
 BINARY_VALID_PARAMETRIZE = (0, 1)
 VALID_PARAMETERS_VALUES = {

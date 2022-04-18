@@ -3,7 +3,7 @@ import os
 import shutil
 import subprocess
 import signal
-from src import drone_controller
+from drones import drone_controller
 
 from . import config
 

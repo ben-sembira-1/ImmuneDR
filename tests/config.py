@@ -11,8 +11,8 @@ TESTS_PORT = 5760
 SITL_PORT = 5760
 TESTS_ADDRESS = f"tcp:localhost:{TESTS_PORT}"
 SITL_ADDRESS = f"tcp:localhost:{SITL_PORT}"
-SIMULATION_DIRECTORY_PATH = "system_tests/simulation_directory"
-MAV_PARAM_FILE_PATH = "system_tests/mav.parm"
+SIMULATION_DIRECTORY_PATH = "simulation_directory"
+MAV_PARAM_FILE_PATH = "tests/asserts/mav.parm"
 MISSION_COMPUTER_MAVLINK_SYSTEM_ID = 2
 
 # -------------------- Distances --------------------

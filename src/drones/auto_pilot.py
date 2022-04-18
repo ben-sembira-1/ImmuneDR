@@ -5,8 +5,8 @@ from typing import Tuple, Optional
 
 from pymavlink.dialects.v20 import ardupilotmega as mavlink
 
-from immune_dr import hz_loop, geo_misc
-from mavlink_drone import drone_controller
+from . import hz_loop, geo_misc
+from . import drone_controller
 
 
 class AutoPilot:
