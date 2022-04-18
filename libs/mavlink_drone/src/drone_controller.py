@@ -76,7 +76,7 @@ class MavlinkData(NamedTuple):
 class Drone:
     MAX_SET_PARAMETER_ACK_TIMEOUT = 2e-1
     DEFAULT_GET_MESSAGE_MAX_AGE_SEC = 4e-1
-    DEFAULT_GET_MESSAGE_TIMEOUT_SEC = 2e-1
+    DEFAULT_GET_MESSAGE_TIMEOUT_SEC = 1.0
     GET_PARAMETER_MAX_AGE_SEC = 1e-1
     GET_HEARTBEAT_MAX_AGE_SEC = 2
     PARAMETER_RECEIVE_TIMEOUT_SEC = 1
@@ -99,7 +99,7 @@ class Drone:
         self._latest_mavlink_data: Dict[str, MavlinkData] = {}
         self._latest_heartbeats: Dict[int, MavlinkData] = {}
         self._recv_thread: threading.Thread = threading.Thread(
-            target=self._thr_update_mavlink_messages_loop, daemon=True
+            target=self._thr_update_mavlink_messages_loop, daemon=False
         )
         self._kill_recv_thread: bool = False
 
