@@ -41,5 +41,16 @@ WORKDIR /home/pilot
 
 RUN pip3 install pytest
 
-WORKDIR /home/pilot/app
-CMD "python3 -m pytest ."
+# Create a virtual in-memory X server and a recorder
+RUN mkdir /home/pilot/screen_record
+USER root
+RUN apt-get install -y xvfb ffmpeg
+ENV DISPLAY=:99
+ADD scripts/virtual_xserver/record_virtual_Xserver.sh /home/pilot/screen_record/record_virtual_Xserver.sh
+ADD scripts/virtual_xserver/virtual_Xserver.service /etc/systemd/system/virtual_Xserver.service
+ADD scripts/virtual_xserver/record_virtual_Xserver.service /etc/systemd/system/record_virtual_Xserver.service
+RUN systemctl enable virtual_Xserver \
+    && systemctl enable record_virtual_Xserver
+
+# WORKDIR /home/pilot/app
+# CMD "python3 -m pytest ."

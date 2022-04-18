@@ -1,0 +1,14 @@
+[Unit]
+Name=virtual_Xserver
+Description=An in-memory virtual X-server utility
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=1
+User=root
+ExecStart=Xvfb :99 -screan 0 1920x1080x24
+
+[Install]
+WantedBy=multi-user.target

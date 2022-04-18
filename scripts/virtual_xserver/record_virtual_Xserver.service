@@ -1,0 +1,15 @@
+[Unit]
+Name=record_virtual_Xserver
+Description=Recorder for display number 99 (the virtual X server)
+After=virtual_Xserver
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=1
+User=root
+ExecStart=/bin/bash /home/pilot/screen_record/record_virtual_Xserver.sh
+
+[Install]
+WantedBy=multi-user.target
