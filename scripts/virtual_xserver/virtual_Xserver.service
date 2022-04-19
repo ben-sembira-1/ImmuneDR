@@ -8,7 +8,7 @@ Type=simple
 Restart=always
 RestartSec=1
 User=root
-ExecStart=Xvfb :99 -screan 0 1920x1080x24
+ExecStart=Xvfb :99 -screen 0 1920x1080x24
 
 [Install]
 WantedBy=multi-user.target
