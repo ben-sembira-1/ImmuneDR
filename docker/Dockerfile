@@ -52,5 +52,12 @@ ADD scripts/virtual_xserver/record_virtual_Xserver.service /etc/systemd/system/r
 RUN systemctl enable virtual_Xserver \
     && systemctl enable record_virtual_Xserver
 
+# Install MissionPlanner
+RUN mkdir /MissionPlanner
+ADD https://firmware.ardupilot.org/Tools/MissionPlanner/MissionPlanner-latest.zip /MissionPlanner.zip
+RUN unzip -d /MissionPlanner /MissionPlanner.zip \
+    && rm /MissionPlanner.zip
+RUN apt-get install -y mono-devel
+
 # WORKDIR /home/pilot/app
 # CMD "python3 -m pytest ."
