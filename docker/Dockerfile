@@ -43,5 +43,9 @@ USER pilot
 WORKDIR /home/pilot/
 COPY --chown=pilot:pilot . ./app
 WORKDIR /home/pilot/app
+RUN mkdir ~/.ssh/ && \
+    cp ./dependencies_keys/async_state_machine/id_rsa ~/.ssh/ && \
+    cp ./dependencies_keys/async_state_machine/id_rsa.pub ~/.ssh/ && \
+    ssh-keyscan github.com >> ~/.ssh/known_hosts
 RUN pip3 install -e .[test]
 CMD "python3 -m pytest ."
