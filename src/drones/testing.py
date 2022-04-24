@@ -58,6 +58,9 @@ def updated(dict, overlay):
 
 @contextmanager
 def simulation_context(*, cwd: Optional[Path] = None, serial_ports_override: Optional[Dict[int, TcpSerialConnectionDef]]) -> Generator[_RunningSimulation, None, None]:
+    '''
+    When wating multiple ports, the order of the serial_ports determain the order for which ports will be opened and waited on.
+    '''
     cwd = cwd if cwd is not None else Path.cwd()
     serial_ports_override = serial_ports_override if serial_ports_override is not None else {}
     serial_ports = updated(DEFAULT_SERIAL_MAPPING, serial_ports_override)
@@ -95,3 +98,5 @@ def simulation_context(*, cwd: Optional[Path] = None, serial_ports_override: Opt
                 logging.error(f"Simulation exited with non zero code {ret}")
             else:
                 logging.info("Simulation ended successfully")
+            simulation_log = Path('/tmp/ArduCopter.log').read_text()
+            logging.debug(f"Simulation log is\n{simulation_log}")
