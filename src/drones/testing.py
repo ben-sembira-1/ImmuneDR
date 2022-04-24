@@ -1,14 +1,16 @@
+from collections import Counter
 from dataclasses import dataclass
 import logging
-from platform import mac_ver
 import signal
-from typing import Dict, Optional, Generator
+from typing import Dict, Iterator, Optional, Generator
 from pathlib import Path
 from contextlib import contextmanager
 import os
 from subprocess import Popen 
 import pymavlink.mavutil
 
+
+PREALLOCATED_SIMULATION_PORTS = {5763}
 @dataclass
 class TcpSerialConnectionDef:
     '''Represents a tcp connection configuration to the simulation.
@@ -39,19 +41,35 @@ class _RunningSimulation:
         return pymavlink.mavutil.mavlink_connection(serial_def.as_pymavlink_connection_argument())
         
 
+# Defined by the simulation binary of sim_vehicle - do not change
 DEFAULT_SERIAL_MAPPING = {
     0: TcpSerialConnectionDef(port=5760, wait_for_connection=True),
     1: TcpSerialConnectionDef(port=5762, wait_for_connection=False),
     2: TcpSerialConnectionDef(port=5763, wait_for_connection=False),
 }
 
+def all_unique(it: Iterator) -> bool:
+    return all(count == 1 for count in Counter(it).values())
+
+def updated(dict, overlay):
+    r = dict.copy()
+    r.update(overlay)
+    return r
+
 @contextmanager
-def simulation_context(*, cwd: Optional[Path] = None, serial: Optional[Dict[int, TcpSerialConnectionDef]]) -> Generator[_RunningSimulation, None, None]:
+def simulation_context(*, cwd: Optional[Path] = None, serial_ports_override: Optional[Dict[int, TcpSerialConnectionDef]]) -> Generator[_RunningSimulation, None, None]:
     cwd = cwd if cwd is not None else Path.cwd()
-    serial = serial if serial is not None else DEFAULT_SERIAL_MAPPING 
+    serial_ports_override = serial_ports_override if serial_ports_override is not None else {}
+    serial_ports = updated(DEFAULT_SERIAL_MAPPING, serial_ports_override)
     SIM_VEHICLE_PATH = os.environ.get("SIM_VEHICLE_PATH", "/home/pilot/ardupilot/Tools/autotest/sim_vehicle.py")
 
-    args_to_binary = ["-A"] + [f"--serial{n}={s.as_ardupilot_cli_argument()}" for n, s in serial.items()]
+    assert all(con_def.port.bit_length() <= 16 for con_def in serial_ports.values()), "Ports should be u16 representable."
+    assert all_unique(con_def.port for con_def in serial_ports.values()), "Ports shouldn't overlap"
+
+    logging.info(f"Creating simulation with the following serial mapping {serial_ports}")
+
+    # sim_vehicle.py passes -A argument (single string expected) to the simulation binary
+    args_to_binary = ["-A", ' '.join(f"--serial{n}={s.as_ardupilot_cli_argument()}" for n, s in serial_ports.items())]
     
     sitl_args = [
         SIM_VEHICLE_PATH,
@@ -68,7 +86,7 @@ def simulation_context(*, cwd: Optional[Path] = None, serial: Optional[Dict[int,
 
     with Popen(args=sitl_args, cwd=cwd) as sitl_process:
         try: 
-            yield _RunningSimulation(sitl_process, serial)
+            yield _RunningSimulation(sitl_process, serial_ports_override)
         finally:
             logging.info("Stoping simulation")
             sitl_process.send_signal(signal.SIGINT)
