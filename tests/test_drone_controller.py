@@ -35,5 +35,4 @@ def sim_drone(tmpdir) -> Generator[DroneClient, None, None]:
 
 
 def test_drone_takeoff(sim_drone: DroneClient):
-    import pdb; pdb.set_trace()
     sim_drone.take_off(10)
