@@ -1,10 +1,15 @@
+import enum
 import logging
 import os
 import random
+from sre_constants import SUCCESS
 from typing import Generator
 import pytest
 
-from drones.drone_client import DroneClient
+from async_state_machine import StateMachine, State
+from async_state_machine.transitions.timeout import timeout
+
+from drones.drone_client import DroneClient, DroneDaemon
 from drones.testing import TcpSerialConnectionDef, simulation_context
 
 
@@ -31,8 +36,64 @@ def sim_drone(tmpdir) -> Generator[DroneClient, None, None]:
         mavlink = sim.mavlink_connect_to_serial(0)
         mavlink.wait_heartbeat(timeout=500)
         logging.debug("Connected successfully to simulation, received hearteat.")
-        yield DroneClient(mavlink)
+        daemon = DroneDaemon(mavlink_connection=mavlink)
+        client = daemon.create_client()
+        try:
+            yield client
+        finally:
+            del daemon
+
+def test_drone_heartbeat(sim_drone: DroneClient):
+
+    @enum.unique
+    class StateNames(enum.Enum):
+        AWAIT_HEARTBEAT = "Await heartbeat"
+        SUCCESS = "Success"
+        ERROR = "Error"
+
+    sm = StateMachine([
+        State(name=StateNames.AWAIT_HEARTBEAT,
+        transitions={
+            StateNames.SUCCESS: sim_drone.heartbeat(),
+            StateNames.ERROR: timeout(secs=10)
+        }),
+
+        State(name=StateNames.SUCCESS,
+        transitions={ }),
+
+        State(name=StateNames.ERROR,
+        transitions={ }),
+    ])
+
+    while sm.current_state.name not in {StateNames.ERROR, StateNames.SUCCESS}:
+        sm.tick()
+    
+    assert sm.current_state.name == StateNames.SUCCESS
 
 
-def test_drone_takeoff(sim_drone: DroneClient):
-    sim_drone.take_off(10)
+def test_drone_armed(sim_drone: DroneClient):
+
+    @enum.unique
+    class StateNames(enum.Enum):
+        AWAIT_ARM = "Await Arm"
+        ARMED = "Armed"
+        ERROR = "Error"
+
+    sm = StateMachine([
+        State(name=StateNames.AWAIT_ARM,
+        transitions={
+            StateNames.ARMED: sim_drone.arm(),
+            StateNames.ERROR: timeout(secs=10)
+        }),
+
+        State(name=StateNames.ARMED,
+        transitions={ }),
+
+        State(name=StateNames.ERROR,
+        transitions={ }),
+    ])
+
+    while sm.current_state.name not in {StateNames.ERROR, StateNames.ARMED}:
+        sm.tick()
+    
+    assert sm.current_state.name == StateNames.ARMED
