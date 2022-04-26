@@ -75,11 +75,17 @@ def test_drone_armed(sim_drone: DroneClient):
 
     @enum.unique
     class StateNames(enum.Enum):
+        AWAIT_PREFLIGHT = "Await Preflight"
         AWAIT_ARM = "Await Arm"
         ARMED = "Armed"
         ERROR = "Error"
 
     sm = StateMachine([
+        State(name=StateNames.AWAIT_PREFLIGHT,
+        transitions={
+            StateNames.AWAIT_ARM: sim_drone.preflight_finished(),
+            StateNames.ERROR: timeout(secs=25)
+        }),
         State(name=StateNames.AWAIT_ARM,
         transitions={
             StateNames.ARMED: sim_drone.arm(),
