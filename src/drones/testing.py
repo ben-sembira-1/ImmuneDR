@@ -8,6 +8,7 @@ from contextlib import contextmanager
 import os
 from subprocess import Popen 
 import pymavlink.mavutil
+from pyparsing import Mapping
 
 
 PREALLOCATED_SIMULATION_PORTS = {5763}
@@ -51,7 +52,7 @@ DEFAULT_SERIAL_MAPPING = {
 def all_unique(it: Iterator) -> bool:
     return all(count == 1 for count in Counter(it).values())
 
-def updated(dict, overlay):
+def updated(dict: Dict, overlay: Mapping) -> Dict:
     r = dict.copy()
     r.update(overlay)
     return r

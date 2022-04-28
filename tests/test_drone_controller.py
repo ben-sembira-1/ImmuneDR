@@ -1,6 +1,7 @@
 import enum
 import logging
 import os
+from pathlib import Path
 import random
 from sre_constants import SUCCESS
 from typing import Generator
@@ -9,12 +10,13 @@ import pytest
 from async_state_machine import StateMachine, State
 from async_state_machine.transitions.timeout import timeout
 
-from drones.drone_client import DroneClient, DroneDaemon
+from drones.drone_client import DroneClient
+from drones.drone_daemon import DroneDaemon
 from drones.testing import TcpSerialConnectionDef, simulation_context
 
 
 @pytest.fixture(scope="function")
-def sim_drone(tmpdir) -> Generator[DroneClient, None, None]:
+def sim_drone(tmpdir: str) -> Generator[DroneClient, None, None]:
     port = random.randrange(5900, 6100)
     logging.info(f"Using random tcp port {port} for simulation connection")
     serial_ports_override = {}
@@ -30,7 +32,7 @@ def sim_drone(tmpdir) -> Generator[DroneClient, None, None]:
         port=port, wait_for_connection=True
     )
     with simulation_context(
-        cwd=tmpdir,
+        cwd=Path(tmpdir),
         serial_ports_override=serial_ports_override,
     ) as sim:
         mavlink = sim.mavlink_connect_to_serial(0)
@@ -43,7 +45,7 @@ def sim_drone(tmpdir) -> Generator[DroneClient, None, None]:
         finally:
             del daemon
 
-def test_drone_heartbeat(sim_drone: DroneClient):
+def test_drone_heartbeat(sim_drone: DroneClient) -> None:
 
     @enum.unique
     class StateNames(enum.Enum):
@@ -71,7 +73,7 @@ def test_drone_heartbeat(sim_drone: DroneClient):
     assert sm.current_state.name == StateNames.SUCCESS
 
 
-def test_drone_armed(sim_drone: DroneClient):
+def test_drone_armed(sim_drone: DroneClient) -> None:
 
     @enum.unique
     class StateNames(enum.Enum):
