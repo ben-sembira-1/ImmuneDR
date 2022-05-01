@@ -1,4 +1,5 @@
 from abc import abstractmethod
+from lib2to3.pgen2.token import OP
 import logging
 from typing import Callable, Optional, cast
 
@@ -8,6 +9,14 @@ from pymavlink.dialects.v20.ardupilotmega import (
     MAV_MODE_FLAG_SAFETY_ARMED,
     MAV_STATE_STANDBY,
     EKF_ATTITUDE,
+    EKF_VELOCITY_HORIZ,
+    EKF_VELOCITY_VERT,
+    EKF_POS_HORIZ_REL,
+    EKF_POS_HORIZ_ABS,
+    EKF_POS_VERT_ABS,
+    EKF_POS_VERT_AGL,
+    EKF_PRED_POS_HORIZ_REL,
+    EKF_PRED_POS_HORIZ_ABS,
     MAVLink_statustext_message,
     MAVLink_ekf_status_report_message,
     MAVLink_local_position_ned_message,
@@ -19,7 +28,7 @@ from async_state_machine.transitions.types import (
     TransitionChecker,
 )
 
-from drones.commands import Arm, CommandSender, LocalPositionNED, Takeoff
+from drones.commands import Arm, CommandSender, FlightMode, LocalPositionNED, SetFlightMode, Takeoff
 
 
 def _is_heartbeat(message: MAVLink_message) -> bool:
@@ -34,6 +43,13 @@ def _is_armed(message: MAVLink_message) -> Optional[bool]:
     assert isinstance(message, MAVLink_heartbeat_message)
     logging.debug(f"Hearbeat message: {message}")
     return cast(bool, (message.base_mode & MAV_MODE_FLAG_SAFETY_ARMED) != 0)
+
+def _is_flight_mode(message: MAVLink_message, mode: FlightMode) -> Optional[bool]:
+    if message.get_type() != "HEARTBEAT":
+        return None
+    assert isinstance(message, MAVLink_heartbeat_message)
+    logging.debug(f"Hearbeat message: {message}")
+    return FlightMode.GUIDED.value == cast(int, message.custom_mode)
 
 
 def _is_state_standby(message: MAVLink_message) -> Optional[bool]:
@@ -50,7 +66,16 @@ def _is_ekf_good(message: MAVLink_message) -> Optional[bool]:
         return None
     assert isinstance(message, MAVLink_ekf_status_report_message)
     logging.debug(f"Ekf status report message message: {message}")
-    return cast(bool, (message.flags & EKF_ATTITUDE) != 0)
+    return cast(bool, message.flags == (
+        EKF_ATTITUDE
+        | EKF_VELOCITY_HORIZ
+        | EKF_VELOCITY_VERT
+        | EKF_POS_HORIZ_REL
+        | EKF_POS_HORIZ_ABS
+        | EKF_POS_VERT_ABS
+        | EKF_PRED_POS_HORIZ_REL
+        | EKF_PRED_POS_HORIZ_ABS
+    ))
 
 
 def _get_local_position(message: MAVLink_message) -> Optional[LocalPositionNED]:
@@ -106,6 +131,12 @@ class DroneClient:
         return ActAndWaitForCheckerFactory(
             action_callback=lambda: self._commands_queue_tx.send(Arm()),
             wait_for=self._event_client.when(_is_armed),
+        )
+    
+    def set_flight_mode(self, mode: FlightMode) -> TransitionCheckerFactory:
+        return ActAndWaitForCheckerFactory(
+            action_callback=lambda: self._commands_queue_tx.send(SetFlightMode(mode)),
+            wait_for=self._event_client.when(lambda msg: _is_flight_mode(msg, mode)),
         )
 
     def when_local_position(

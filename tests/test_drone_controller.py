@@ -9,6 +9,7 @@ import pytest
 
 from async_state_machine import StateMachine, State
 from async_state_machine.transitions.timeout import timeout
+from drones.commands import FlightMode
 
 from drones.drone_client import DroneClient
 from drones.drone_daemon import DroneDaemon
@@ -112,6 +113,7 @@ def test_drone_takeoff(sim_drone: DroneClient) -> None:
     @enum.unique
     class StateNames(enum.Enum):
         AWAIT_PREFLIGHT = "Await Preflight"
+        AWAIT_GUIDED_MODE = "Await Guided Mode"
         AWAIT_ARM = "Await Arm"
         TAKING_OFF = "Taking off"
 
@@ -123,8 +125,15 @@ def test_drone_takeoff(sim_drone: DroneClient) -> None:
             State(
                 name=StateNames.AWAIT_PREFLIGHT,
                 transitions={
-                    StateNames.AWAIT_ARM: sim_drone.preflight_finished(),
-                    StateNames.ERROR: timeout(secs=25),
+                    StateNames.AWAIT_GUIDED_MODE: sim_drone.preflight_finished(),
+                    StateNames.ERROR: timeout(secs=120),
+                },
+            ),
+            State(
+                name=StateNames.AWAIT_GUIDED_MODE,
+                transitions={
+                    StateNames.AWAIT_ARM: sim_drone.set_flight_mode(FlightMode.GUIDED),
+                    StateNames.ERROR: timeout(secs=10),
                 },
             ),
             State(

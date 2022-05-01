@@ -1,6 +1,7 @@
 from abc import abstractmethod
 from collections import deque
 from dataclasses import dataclass
+from enum import Enum
 import logging
 from math import nan
 from typing import Deque, Optional, Protocol, Tuple
@@ -58,25 +59,33 @@ class Takeoff(Command):
     def __init__(self, height_m: float, yaw_angle: float = nan, ascend_rate_mps: float = 10.0) -> None:
         super().__init__()
         self.height_m = height_m
-        self.yaw_angle = yaw_angle
-        self.ascend_rate_mps = ascend_rate_mps
-        self.minimum_pitch = 0.0
-        self.position = LocalPositionNED(down=-height_m)
 
     def __call__(self, mavlink_connection: mavfile) -> None:
         logging.info("Executing takeoff")
-        from pymavlink.dialects.v20.ardupilotmega import MAVLink, MAV_CMD_NAV_TAKEOFF_LOCAL
+        from pymavlink.dialects.v20.ardupilotmega import MAVLink, MAV_CMD_NAV_TAKEOFF
         mav: MAVLink = mavlink_connection.mav
         mav.command_long_send(
             target_system=mavlink_connection.target_system,
             target_component=mavlink_connection.target_component,
-            command=MAV_CMD_NAV_TAKEOFF_LOCAL,
+            command=MAV_CMD_NAV_TAKEOFF,
             confirmation=0,
-            param1=self.minimum_pitch,
+            param1=0.0,
             param2=0.0,
-            param3=self.ascend_rate_mps,
-            param4=self.yaw_angle,
-            param5=self.position.east,
-            param6=self.position.north,
-            param7=self.position.down,
+            param3=0.0,
+            param4=nan,
+            param5=0.0,
+            param6=0.0,
+            param7=self.height_m,
         )
+
+class FlightMode(Enum):
+    GUIDED = 4
+
+class SetFlightMode(Command):
+    def __init__(self, mode: FlightMode) -> None:
+        super().__init__()
+        self.mode = mode
+
+    def __call__(self, mavlink_connection: mavfile) -> None:
+        logging.info("Setting flight mode")
+        mavlink_connection.set_mode(self.mode.value)
