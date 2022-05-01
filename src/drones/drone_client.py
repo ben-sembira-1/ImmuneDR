@@ -10,6 +10,7 @@ from pymavlink.dialects.v20.ardupilotmega import (
     EKF_ATTITUDE,
     MAVLink_statustext_message,
     MAVLink_ekf_status_report_message,
+    MAVLink_local_position_ned_message,
 )
 from async_state_machine.client import Client, _ClientEventReaderFactory
 from async_state_machine.transitions.combinators import all_of
@@ -18,12 +19,12 @@ from async_state_machine.transitions.types import (
     TransitionChecker,
 )
 
-from drones.commands import Arm, CommandSender
+from drones.commands import Arm, CommandSender, LocalPositionNED, Takeoff
 
 
 def _is_heartbeat(message: MAVLink_message) -> bool:
     return cast(str, message.get_type()) != "HEARTBEAT"
-    
+
 
 def _is_armed(message: MAVLink_message) -> Optional[bool]:
     if isinstance(message, MAVLink_statustext_message):
@@ -50,6 +51,18 @@ def _is_ekf_good(message: MAVLink_message) -> Optional[bool]:
     assert isinstance(message, MAVLink_ekf_status_report_message)
     logging.debug(f"Ekf status report message message: {message}")
     return cast(bool, (message.flags & EKF_ATTITUDE) != 0)
+
+
+def _get_local_position(message: MAVLink_message) -> Optional[LocalPositionNED]:
+    if message.get_msgId() != MAVLink_local_position_ned_message.id:
+        return None
+    assert isinstance(message, MAVLink_local_position_ned_message)
+    logging.debug(f"Local position: {str(message)}")
+    return LocalPositionNED(
+        north=message.x,
+        east=message.y,
+        down=message.z,
+    )
 
 
 class ActAndWaitForCheckerFactory(TransitionCheckerFactory):
@@ -93,4 +106,25 @@ class DroneClient:
         return ActAndWaitForCheckerFactory(
             action_callback=lambda: self._commands_queue_tx.send(Arm()),
             wait_for=self._event_client.when(_is_armed),
+        )
+
+    def when_local_position(
+        self, condition: Callable[[LocalPositionNED], Optional[bool]]
+    ) -> TransitionCheckerFactory:
+        return self._event_client.when(
+            lambda m: condition(cast(LocalPositionNED, _get_local_position(m)))
+            if _get_local_position(m) is not None
+            else None
+        )
+
+    def takeoff(
+        self, height_m: float, allowed_error_m: float = 0.1
+    ) -> TransitionCheckerFactory:
+        return ActAndWaitForCheckerFactory(
+            action_callback=lambda: self._commands_queue_tx.send(
+                Takeoff(height_m=height_m)
+            ),
+            wait_for=self.when_local_position(
+                lambda p: abs(height_m - (-p.down)) <= allowed_error_m
+            ),
         )

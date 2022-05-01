@@ -1,13 +1,23 @@
 import logging
 from threading import Event, Thread
+from typing import Dict
 from pymavlink.mavutil import mavfile
-from pymavlink.dialects.v20.ardupilotmega import MAVLink_message, MAVLink_ekf_status_report_message, MAV_CMD_SET_MESSAGE_INTERVAL
+from pymavlink.dialects.v20.ardupilotmega import (
+    MAVLink_message,
+    MAVLink_ekf_status_report_message,
+    MAVLink_local_position_ned_message,
+    MAV_CMD_SET_MESSAGE_INTERVAL,
+)
 from async_state_machine.client import Client
 
 from drones.commands import CommandReceiver, CommandSender, create_command_queue_pair
 from drones.drone_client import DroneClient
 
-MESSAGES_INTERVAL_US = {MAVLink_ekf_status_report_message: 10_000}
+MESSAGES_INTERVAL_US: Dict[MAVLink_message, float] = {
+    MAVLink_ekf_status_report_message: 10_000.0,
+    MAVLink_local_position_ned_message: 10_000.0,
+}
+
 
 def _mavlink_control_loop(
     mavlink_connection: mavfile,
@@ -23,7 +33,9 @@ def _mavlink_control_loop(
 
         mav: MAVLink = mavlink_connection.mav
         for msg_type, interval in MESSAGES_INTERVAL_US.items():
-            logging.info(f"Set message {msg_type.name} ({msg_type.id}) to {interval}[us]")
+            logging.info(
+                f"Set message {msg_type.name} ({msg_type.id}) to {interval}[us]"
+            )
             mav.command_long_send(
                 target_system=target_system_id,
                 target_component=target_component_id,
@@ -42,6 +54,7 @@ def _mavlink_control_loop(
         while not stop_loop.is_set():
             msg = mavlink_connection.recv_msg()
             if msg is not None:
+                logging.debug(f"drone daemon received mavlink message: {msg}")
                 sender_client.to_state_machine(msg)
             cmd = command_rx_queue.receive()
             if cmd is not None:
@@ -51,6 +64,7 @@ def _mavlink_control_loop(
         raise
     finally:
         mavlink_connection.close()
+
 
 class DroneDaemon:
     drone_system_id: int
