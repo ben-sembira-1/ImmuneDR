@@ -14,6 +14,8 @@ from drones.drone_client import DroneClient
 from drones.drone_daemon import DroneDaemon
 from drones.testing import TcpSerialConnectionDef, simulation_context
 
+from tests.state_machine_utils import run_until
+
 
 @pytest.fixture(scope="function")
 def sim_drone(tmpdir: str) -> Generator[DroneClient, None, None]:
@@ -67,10 +69,7 @@ def test_drone_heartbeat(sim_drone: DroneClient) -> None:
         ]
     )
 
-    while sm.current_state.name not in {StateNames.ERROR, StateNames.SUCCESS}:
-        sm.tick()
-
-    assert sm.current_state.name == StateNames.SUCCESS
+    run_until(sm, target=StateNames.SUCCESS, error_states={StateNames.ERROR})
 
 
 def test_drone_armed(sim_drone: DroneClient) -> None:
@@ -102,10 +101,7 @@ def test_drone_armed(sim_drone: DroneClient) -> None:
         ]
     )
 
-    while sm.current_state.name not in {StateNames.ERROR, StateNames.ARMED}:
-        sm.tick()
-
-    assert sm.current_state.name == StateNames.ARMED
+    run_until(sm, target=StateNames.ARMED, error_states={StateNames.ERROR})
 
 
 def test_drone_takeoff(sim_drone: DroneClient) -> None:
@@ -154,7 +150,7 @@ def test_drone_takeoff(sim_drone: DroneClient) -> None:
         ]
     )
 
-    while sm.current_state.name not in {StateNames.ERROR, StateNames.IN_THE_AIR}:
-        sm.tick()
+    run_until(sm, target=StateNames.IN_THE_AIR, error_states={StateNames.ERROR})
+
 
     assert sm.current_state.name == StateNames.IN_THE_AIR
