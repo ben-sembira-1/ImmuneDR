@@ -87,7 +87,7 @@ def test_drone_armed(sim_drone: DroneClient) -> None:
                 name=StateNames.AWAIT_PREFLIGHT,
                 transitions={
                     StateNames.AWAIT_ARM: sim_drone.preflight_finished(),
-                    StateNames.ERROR: timeout(secs=25),
+                    StateNames.ERROR: timeout(secs=120),
                 },
             ),
             State(
