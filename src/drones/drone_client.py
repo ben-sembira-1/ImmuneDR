@@ -54,8 +54,8 @@ def _is_flight_mode(message: MAVLink_message, mode: FlightMode) -> Optional[bool
     if message.get_type() != "HEARTBEAT":
         return None
     assert isinstance(message, MAVLink_heartbeat_message)
-    logging.debug(f"Hearbeat message: {message}")
-    return FlightMode.GUIDED.value == cast(int, message.custom_mode)
+    logging.debug(f"Heartbeat message: {message}")
+    return mode.value == cast(int, message.custom_mode)
 
 
 def _is_state_standby(message: MAVLink_message) -> Optional[bool]:
