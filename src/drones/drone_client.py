@@ -12,14 +12,13 @@ from pymavlink.dialects.v20.ardupilotmega import (
     EKF_POS_HORIZ_REL,
     EKF_POS_HORIZ_ABS,
     EKF_POS_VERT_ABS,
-    EKF_POS_VERT_AGL,
     EKF_PRED_POS_HORIZ_REL,
     EKF_PRED_POS_HORIZ_ABS,
     MAVLink_statustext_message,
     MAVLink_ekf_status_report_message,
     MAVLink_local_position_ned_message,
 )
-from async_state_machine.client import Client, _ClientEventReaderFactory
+from async_state_machine.client import _ClientEventReaderFactory
 from async_state_machine.transitions.combinators import all_of
 from async_state_machine.transitions.types import (
     TransitionCheckerFactory,
