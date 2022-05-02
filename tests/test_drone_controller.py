@@ -3,7 +3,6 @@ import logging
 import os
 from pathlib import Path
 import random
-from sre_constants import SUCCESS
 from typing import Generator
 import pytest
 
@@ -38,7 +37,7 @@ def sim_drone(tmpdir: str) -> Generator[DroneClient, None, None]:
     ) as sim:
         mavlink = sim.mavlink_connect_to_serial(0)
         mavlink.wait_heartbeat(timeout=500)
-        logging.debug("Connected successfully to simulation, received hearteat.")
+        logging.debug("Connected successfully to simulation, received heartbeat.")
         daemon = DroneDaemon(mavlink_connection=mavlink)
         client = daemon.create_client()
         try:
