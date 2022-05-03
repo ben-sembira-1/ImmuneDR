@@ -46,6 +46,7 @@ WORKDIR /home/pilot/app
 RUN mkdir ~/.ssh/ && \
     cp ./dependencies_keys/async_state_machine/id_rsa ~/.ssh/ && \
     cp ./dependencies_keys/async_state_machine/id_rsa.pub ~/.ssh/ && \
-    ssh-keyscan github.com >> ~/.ssh/known_hosts
+    ssh-keyscan github.com >> ~/.ssh/known_hosts && \
+    chmod 700 ~/.ssh && chmod 600 ~/.ssh/id_rsa
 RUN pip3 install -e .[test]
 CMD "python3 -m pytest ."
