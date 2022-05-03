@@ -2,11 +2,11 @@ import enum
 
 from async_state_machine import StateMachine, State
 from async_state_machine.transitions.timeout import timeout
-from drones.mavlink_types import FlightMode
 
 from drones.drone_client import DroneClient
 
 from tests.state_machine_utils import run_until
+from tests.takeoff_state_machine import get_takeoff_state_machine, TakeoffStateNames
 
 
 def test_drone_heartbeat(sim_drone: DroneClient) -> None:
@@ -66,49 +66,29 @@ def test_drone_armed(sim_drone: DroneClient) -> None:
 
 
 def test_drone_takeoff(sim_drone: DroneClient) -> None:
-    @enum.unique
-    class StateNames(enum.Enum):
-        AWAIT_PREFLIGHT = "Await Preflight"
-        AWAIT_GUIDED_MODE = "Await Guided Mode"
-        AWAIT_ARM = "Await Arm"
-        TAKING_OFF = "Taking off"
-
-        IN_THE_AIR = "In the air"
-        ERROR = "Error"
-
-    sm = StateMachine(
-        [
-            State(
-                name=StateNames.AWAIT_PREFLIGHT,
-                transitions={
-                    StateNames.AWAIT_GUIDED_MODE: sim_drone.preflight_finished(),
-                    StateNames.ERROR: timeout(secs=120),
-                },
-            ),
-            State(
-                name=StateNames.AWAIT_GUIDED_MODE,
-                transitions={
-                    StateNames.AWAIT_ARM: sim_drone.set_flight_mode(FlightMode.GUIDED),
-                    StateNames.ERROR: timeout(secs=10),
-                },
-            ),
-            State(
-                name=StateNames.AWAIT_ARM,
-                transitions={
-                    StateNames.TAKING_OFF: sim_drone.arm(),
-                    StateNames.ERROR: timeout(secs=10),
-                },
-            ),
-            State(
-                name=StateNames.TAKING_OFF,
-                transitions={
-                    StateNames.IN_THE_AIR: sim_drone.takeoff(height_m=15),
-                    StateNames.ERROR: timeout(secs=25),
-                },
-            ),
-            State(name=StateNames.IN_THE_AIR, transitions={}),
-            State(name=StateNames.ERROR, transitions={}),
-        ]
+    sm = get_takeoff_state_machine(sim_drone)
+    run_until(
+        sm, target=TakeoffStateNames.IN_THE_AIR, error_states={TakeoffStateNames.ERROR}
     )
 
-    run_until(sm, target=StateNames.IN_THE_AIR, error_states={StateNames.ERROR})
+
+def test_turn():
+    # TODO parametrize with different start and target headings
+    # TODO test illegal heading (out of range)
+    assert False
+
+
+def test_disable_gps():
+    # TODO Make sure that the EKF status changes
+    assert False
+
+
+def test_change_altitude():
+    # TODO parametrize with different start and target altitudes
+    assert False
+
+
+def test_land():
+    # TODO start at different heights
+    # TODO check that drone is disarmed
+    assert False

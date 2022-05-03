@@ -7,6 +7,8 @@ from typing import Generator
 import pymavlink.mavutil
 import pytest
 
+from tests.state_machine_utils import run_until
+from tests.takeoff_state_machine import get_takeoff_state_machine, TakeoffStateNames
 from drones.drone_client import DroneClient
 from drones.drone_daemon import DroneDaemon
 from drones.testing import TcpSerialConnectionDef, simulation_context
@@ -47,3 +49,15 @@ def sim_drone(
         yield client
     finally:
         del daemon
+
+
+@pytest.fixture
+def flying_sim_drone(sim_drone: DroneClient) -> DroneClient:
+    """
+    Returns a DroneClient after takeoff
+    """
+    sm = get_takeoff_state_machine(sim_drone)
+    run_until(
+        sm, target=TakeoffStateNames.IN_THE_AIR, error_states={TakeoffStateNames.ERROR}
+    )
+    return sim_drone
