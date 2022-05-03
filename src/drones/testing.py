@@ -110,6 +110,7 @@ def simulation_context(
     ]
 
     sitl_args = [
+        "python3",
         SIM_VEHICLE_PATH,
         "-v",
         "ArduCopter",
