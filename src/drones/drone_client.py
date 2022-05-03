@@ -17,6 +17,7 @@ from pymavlink.dialects.v20.ardupilotmega import (
     MAVLink_statustext_message,
     MAVLink_ekf_status_report_message,
     MAVLink_local_position_ned_message,
+    MAVLink_global_position_int_message,
 )
 from async_state_machine.client import _ClientEventReaderFactory
 from async_state_machine.transitions.combinators import all_of
@@ -30,6 +31,8 @@ from drones.commands import (
     CommandSender,
     SetFlightMode,
     Takeoff,
+    ChangeHeading,
+    ChangeAltitude,
 )
 from drones.mavlink_types import FlightMode, LocalPositionNED, GlobalPositionInt
 
@@ -95,6 +98,24 @@ def _get_local_position(message: MAVLink_message) -> Optional[LocalPositionNED]:
         north=message.x,
         east=message.y,
         down=message.z,
+    )
+
+
+def _get_global_position_int(message: MAVLink_message) -> Optional[GlobalPositionInt]:
+    if message.get_msgId() != MAVLink_global_position_int_message.id:
+        return None
+    assert isinstance(message, MAVLink_global_position_int_message)
+    logging.debug(f"Global position: {message}")
+    return GlobalPositionInt(
+        time_boot_ms=message.time_boot_ms,
+        latitude=message.lat,
+        longitude=message.lon,
+        altitude=message.alt,
+        altitude_above_ground=message.relative_alt,
+        vx=message.vx,
+        vy=message.vy,
+        vz=message.vz,
+        heading_cdeg=message.hdg,
     )
 
 

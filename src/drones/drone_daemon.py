@@ -6,6 +6,7 @@ from pymavlink.dialects.v20.ardupilotmega import (
     MAVLink_message,
     MAVLink_ekf_status_report_message,
     MAVLink_local_position_ned_message,
+    MAVLink_global_position_int_message,
     MAV_CMD_SET_MESSAGE_INTERVAL,
 )
 from async_state_machine.client import Client
@@ -16,6 +17,7 @@ from drones.drone_client import DroneClient
 MESSAGES_INTERVAL_US: Dict[MAVLink_message, float] = {
     MAVLink_ekf_status_report_message: 10_000.0,
     MAVLink_local_position_ned_message: 10_000.0,
+    MAVLink_global_position_int_message: 10_000.0,
 }
 
 
