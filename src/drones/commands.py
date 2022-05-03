@@ -86,7 +86,15 @@ class Takeoff(Command):
 
 
 class FlightMode(Enum):
+    """
+    For a description of the different supported flight modes, see https://ardupilot.org/copter/docs/flight-modes.html
+
+    See https://mavlink.io/en/messages/ardupilotmega.html#COPTER_MODE for the full list of flight modes and their enum
+    values
+    """
+
     GUIDED = 4
+    LAND = 9
 
 
 class SetFlightMode(Command):
