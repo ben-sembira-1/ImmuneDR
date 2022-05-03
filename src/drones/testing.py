@@ -10,7 +10,6 @@ from subprocess import Popen
 import pymavlink.mavutil
 from pyparsing import Mapping
 
-
 PREALLOCATED_SIMULATION_PORTS = {5763}
 
 
@@ -76,6 +75,7 @@ def simulation_context(
     *,
     cwd: Optional[Path] = None,
     serial_ports_override: Optional[Dict[int, TcpSerialConnectionDef]],
+    speedup: int = 1,
 ) -> Generator[_RunningSimulation, None, None]:
     """
     When wating multiple ports, the order of the serial_ports determain the order for which ports will be opened and waited on.
@@ -116,6 +116,8 @@ def simulation_context(
         "ArduCopter",
         "--no-rebuild",
         "--no-mavproxy",
+        "--speedup",
+        str(speedup),
     ]
 
     if len(args_to_binary) > 1:

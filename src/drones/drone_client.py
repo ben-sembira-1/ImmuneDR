@@ -28,11 +28,10 @@ from async_state_machine.transitions.types import (
 from drones.commands import (
     Arm,
     CommandSender,
-    FlightMode,
-    LocalPositionNED,
     SetFlightMode,
     Takeoff,
 )
+from drones.mavlink_types import FlightMode, LocalPositionNED, GlobalPositionInt
 
 
 def _is_heartbeat(message: MAVLink_message) -> bool:

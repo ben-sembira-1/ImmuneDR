@@ -2,7 +2,7 @@ import enum
 
 from async_state_machine import StateMachine, State
 from async_state_machine.transitions.timeout import timeout
-from drones.commands import FlightMode
+from drones.mavlink_types import FlightMode
 
 from drones.drone_client import DroneClient
 

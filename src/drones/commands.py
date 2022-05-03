@@ -1,12 +1,12 @@
 from abc import abstractmethod
 from collections import deque
-from dataclasses import dataclass
-from enum import Enum
 import logging
 from math import nan
 from typing import Deque, Optional, Protocol, Tuple
 
 from pymavlink.mavutil import mavfile
+
+from drones.mavlink_types import FlightMode
 
 
 class Command(Protocol):
@@ -47,15 +47,6 @@ class Arm(Command):
     def __call__(self, mavlink_connection: mavfile) -> None:
         logging.info("Executing Arm")
         mavlink_connection.arducopter_arm()
-
-
-@dataclass
-class LocalPositionNED:
-    """Position in meters. Origin is where the"""
-
-    north: float = 0
-    east: float = 0
-    down: float = 0
 
 
 class Takeoff(Command):
