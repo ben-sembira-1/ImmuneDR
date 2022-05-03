@@ -35,6 +35,7 @@ from drones.commands import (
     ChangeAltitude,
 )
 from drones.mavlink_types import FlightMode, LocalPositionNED, GlobalPositionInt
+from drones.navigation_utils import angle_diff
 
 
 def _is_heartbeat(message: MAVLink_message) -> bool:
@@ -51,6 +52,13 @@ def _is_armed(message: MAVLink_message) -> Optional[bool]:
     return cast(bool, (message.base_mode & MAV_MODE_FLAG_SAFETY_ARMED) != 0)
 
 
+def _is_disarmed(message: MAVLink_message) -> Optional[bool]:
+    is_armed = _is_armed(message)
+    if is_armed is None:
+        return None
+    return not is_armed
+
+
 def _is_flight_mode(message: MAVLink_message, mode: FlightMode) -> Optional[bool]:
     if message.get_type() != "HEARTBEAT":
         return None
@@ -65,6 +73,11 @@ def _is_state_standby(message: MAVLink_message) -> Optional[bool]:
     assert isinstance(message, MAVLink_heartbeat_message)
     logging.debug(f"Hearbeat message: {message}")
     return cast(bool, message.system_status == MAV_STATE_STANDBY)
+
+
+def _is_cancel_dr(message: MAVLink_message) -> Optional[bool]:
+    # TODO
+    return None
 
 
 def _is_ekf_good(message: MAVLink_message) -> Optional[bool]:
@@ -87,6 +100,13 @@ def _is_ekf_good(message: MAVLink_message) -> Optional[bool]:
             | EKF_PRED_POS_HORIZ_ABS
         ),
     )
+
+
+def _is_ekf_bad(message: MAVLink_message) -> Optional[bool]:
+    ekf_good = _is_ekf_good(message)
+    if ekf_good is None:
+        return None
+    return not ekf_good
 
 
 def _get_local_position(message: MAVLink_message) -> Optional[LocalPositionNED]:
@@ -148,11 +168,17 @@ class DroneClient:
     def heartbeat(self) -> TransitionCheckerFactory:
         return self._event_client.when(_is_heartbeat)
 
+    def ekf_good(self) -> TransitionCheckerFactory:
+        return self._event_client.when(_is_ekf_good)
+
+    def ekf_bad(self) -> TransitionCheckerFactory:
+        return self._event_client.when(_is_ekf_bad)
+
     def preflight_finished(self) -> TransitionCheckerFactory:
         return all_of(
             [
                 self._event_client.when(_is_state_standby),
-                self._event_client.when(_is_ekf_good),
+                self.ekf_good(),
             ]
         )
 
@@ -177,6 +203,15 @@ class DroneClient:
             else None
         )
 
+    def when_heading(
+        self, condition: Callable[[GlobalPositionInt], Optional[bool]]
+    ) -> TransitionCheckerFactory:
+        return self._event_client.when(
+            lambda m: condition(cast(GlobalPositionInt, _get_global_position_int(m)))
+            if _get_global_position_int(m) is not None
+            else None
+        )
+
     def takeoff(
         self, height_m: float, allowed_error_m: float = 0.1
     ) -> TransitionCheckerFactory:
@@ -188,3 +223,40 @@ class DroneClient:
                 lambda p: abs(height_m - (-p.down)) <= allowed_error_m
             ),
         )
+
+    def change_altitude(
+        self, height_m: float, allowed_error_m: float = 0.1
+    ) -> TransitionCheckerFactory:
+        return ActAndWaitForCheckerFactory(
+            action_callback=lambda: self._commands_queue_tx.send(
+                ChangeAltitude(height_m=height_m)
+            ),
+            wait_for=self.when_local_position(
+                lambda p: abs(height_m - (-p.down)) <= allowed_error_m
+            ),
+        )
+
+    def turn(
+        self,
+        heading: float,
+        allowed_error_deg: float = 5.0,
+    ) -> TransitionCheckerFactory:
+        return ActAndWaitForCheckerFactory(
+            action_callback=lambda: self._commands_queue_tx.send(
+                ChangeHeading(heading)
+            ),
+            wait_for=self.when_heading(
+                lambda p: abs(angle_diff(heading, p.heading_deg)) <= allowed_error_deg
+            ),
+        )
+
+    def land(self) -> TransitionCheckerFactory:
+        return ActAndWaitForCheckerFactory(
+            action_callback=lambda: self._commands_queue_tx.send(
+                SetFlightMode(FlightMode.LAND)
+            ),
+            wait_for=self._event_client.when(_is_disarmed),
+        )
+
+    def dr_cancelled(self) -> TransitionCheckerFactory:
+        return self._event_client.when(_is_cancel_dr)
