@@ -79,8 +79,8 @@ class Takeoff(Command):
 class ChangeAltitude(Command):
     def __init__(self, height_m: float, alt_rate_of_change: float = 10.0) -> None:
         """
-        Change target altitude at a given rate. This slews the vehicle at a controllable rate between it's previous
-        altitude and the new one. (affects GUIDED only. Outside GUIDED, aircraft ignores these commands.
+        Change target altitude at a given rate. This slews the vehicle at a controllable rate between its previous
+        altitude and the new one. (affects GUIDED only. Outside GUIDED, aircraft ignores these commands.)
 
         :param height_m: Target height in meters
         :param alt_rate_of_change: Rate of change, towards new altitude. 0 for maximum rate change.
