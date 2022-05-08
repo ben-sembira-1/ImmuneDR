@@ -160,5 +160,5 @@ class SetFlightMode(Command):
         self.mode = mode
 
     def __call__(self, mavlink_connection: mavfile) -> None:
-        logging.info("Setting flight mode")
+        logging.info(f"Setting flight mode to {self.mode.name}")
         mavlink_connection.set_mode(self.mode.value)
