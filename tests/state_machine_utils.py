@@ -1,3 +1,4 @@
+from datetime import timedelta, datetime
 from typing import Union, Optional, Set
 
 from async_state_machine import StateMachine
@@ -15,6 +16,7 @@ def run_until(
         Set[StateName],
     ],
     error_states: Optional[Set[StateName]] = None,
+    timeout: Optional[timedelta] = None,
 ) -> None:
     """
     Runs the state machine until it reaches a target state or an error state.
@@ -26,7 +28,12 @@ def run_until(
         targets = {target}
     error_states = error_states or set()
 
+    start_time = datetime.now()
     while sm.current_state.name not in targets | error_states:
+        if timeout is not None and (datetime.now() - start_time > timeout):
+            raise TimeoutError(
+                f"State machine timed out while waiting for state(s) {target}"
+            )
         sm.tick()
 
     if sm.current_state.name in error_states:
