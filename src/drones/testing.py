@@ -129,7 +129,7 @@ def simulation_context(
         try:
             yield _RunningSimulation(sitl_process, serial_ports_override)
         finally:
-            logging.info("Stoping simulation")
+            logging.info("Stopping simulation")
             sitl_process.send_signal(signal.SIGINT)
             ret = sitl_process.wait(10)
             if ret != 0:
