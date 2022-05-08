@@ -13,6 +13,7 @@ from drones.drone_client import DroneClient
 from drones.drone_daemon import DroneDaemon
 from drones.testing import TcpSerialConnectionDef, simulation_context
 
+
 @pytest.fixture
 def mavlink_connection(tmpdir: str) -> pymavlink.mavutil.mavfile:
     port = random.randrange(5900, 6100)
