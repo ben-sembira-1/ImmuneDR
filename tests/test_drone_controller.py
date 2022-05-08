@@ -4,6 +4,7 @@ from async_state_machine import StateMachine, State
 from async_state_machine.transitions.timeout import timeout
 
 from drones.drone_client import DroneClient
+from drones.drone_daemon import disable_gps
 
 from tests.state_machine_utils import run_until
 from tests.takeoff_state_machine import get_takeoff_state_machine, TakeoffStateNames
@@ -72,23 +73,26 @@ def test_drone_takeoff(sim_drone: DroneClient) -> None:
     )
 
 
-def test_turn():
-    # TODO parametrize with different start and target headings
-    # TODO test illegal heading (out of range)
-    assert False
+def test_disable_gps(flying_sim_drone: DroneClient, mavlink_connection):
+    @enum.unique
+    class StateNames(enum.Enum):
+        FLYING = "Flying"
+        NO_GPS = "Lost GPS"
+        ERROR = "Error"
 
+    sm = StateMachine(
+        [
+            State(
+                name=StateNames.FLYING,
+                transitions={
+                    StateNames.NO_GPS: flying_sim_drone.ekf_bad(),
+                    StateNames.ERROR: timeout(secs=5),
+                },
+            ),
+            State(name=StateNames.NO_GPS, transitions={}),
+            State(name=StateNames.ERROR, transitions={}),
+        ]
+    )
 
-def test_disable_gps():
-    # TODO Make sure that the EKF status changes
-    assert False
-
-
-def test_change_altitude():
-    # TODO parametrize with different start and target altitudes
-    assert False
-
-
-def test_land():
-    # TODO start at different heights
-    # TODO check that drone is disarmed
-    assert False
+    disable_gps(mavlink_connection)
+    run_until(sm, target=StateNames.NO_GPS, error_states={StateNames.ERROR})

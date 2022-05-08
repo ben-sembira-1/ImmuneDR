@@ -1,8 +1,10 @@
+import enum
 import logging
 from threading import Event, Thread
 from typing import Dict
-from pymavlink.mavutil import mavfile
+from pymavlink.mavutil import mavfile, mavlink
 from pymavlink.dialects.v20.ardupilotmega import (
+    MAVLink,
     MAVLink_message,
     MAVLink_ekf_status_report_message,
     MAVLink_local_position_ned_message,
@@ -21,6 +23,21 @@ MESSAGES_INTERVAL_US: Dict[MAVLink_message, float] = {
 }
 
 
+class Parameter(enum.Enum):
+    SYSID_MYGCS = enum.auto()
+    FS_EKF_ACTION = enum.auto()
+    SIM_GPS_DISABLE = enum.auto()
+    SIM_RC_FAIL = enum.auto()
+
+
+PARAMETER_TYPES = {
+    Parameter.SYSID_MYGCS: mavlink.MAV_PARAM_TYPE_UINT8,
+    Parameter.FS_EKF_ACTION: mavlink.MAV_PARAM_TYPE_UINT8,
+    Parameter.SIM_GPS_DISABLE: mavlink.MAV_PARAM_TYPE_UINT8,
+    Parameter.SIM_RC_FAIL: mavlink.MAV_PARAM_TYPE_UINT8,
+}
+
+
 def _mavlink_control_loop(
     mavlink_connection: mavfile,
     sender_client: Client[MAVLink_message],
@@ -29,10 +46,7 @@ def _mavlink_control_loop(
     target_system_id: int,
     target_component_id: int,
 ) -> None:
-
     try:
-        from pymavlink.dialects.v20.ardupilotmega import MAVLink
-
         mav: MAVLink = mavlink_connection.mav
         for msg_type, interval in MESSAGES_INTERVAL_US.items():
             logging.info(
@@ -107,3 +121,19 @@ class DroneDaemon:
     def __del__(self) -> None:
         self._stop_loop_event.set()
         self._thread.join(10)
+
+
+def set_parameter(mavlink_connection: mavfile, parameter: Parameter, value):
+    mav: MAVLink = mavlink_connection.mav
+
+    mav.param_set_send(
+        target_system=mavlink_connection.target_system,
+        target_component=mavlink_connection.target_component,
+        param_id=parameter.name.encode("utf-8"),
+        param_value=value,
+        param_type=PARAMETER_TYPES[parameter],
+    )
+
+
+def disable_gps(mavlink_connection: mavfile) -> None:
+    set_parameter(mavlink_connection, Parameter.SIM_GPS_DISABLE, 1)
