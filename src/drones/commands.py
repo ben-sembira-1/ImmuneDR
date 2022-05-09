@@ -1,10 +1,20 @@
+import time
 from abc import abstractmethod
 from collections import deque
 import logging
 from math import nan
 from typing import Deque, Optional, Protocol, Tuple
 
+from pymavlink.mavextra import euler_to_quat
 from pymavlink.mavutil import mavfile
+from pymavlink.dialects.v20.ardupilotmega import (
+    MAVLink,
+    MAV_CMD_NAV_TAKEOFF,
+    MAV_CMD_GUIDED_CHANGE_ALTITUDE,
+    ATTITUDE_TARGET_TYPEMASK_BODY_PITCH_RATE_IGNORE,
+    ATTITUDE_TARGET_TYPEMASK_BODY_YAW_RATE_IGNORE,
+    ATTITUDE_TARGET_TYPEMASK_BODY_ROLL_RATE_IGNORE,
+)
 
 from drones.mavlink_types import FlightMode
 
@@ -58,8 +68,6 @@ class Takeoff(Command):
 
     def __call__(self, mavlink_connection: mavfile) -> None:
         logging.info("Executing takeoff")
-        from pymavlink.dialects.v20.ardupilotmega import MAVLink, MAV_CMD_NAV_TAKEOFF
-
         mav: MAVLink = mavlink_connection.mav
         mav.command_long_send(
             target_system=mavlink_connection.target_system,
@@ -94,11 +102,6 @@ class ChangeAltitude(Command):
 
     def __call__(self, mavlink_connection: mavfile) -> None:
         logging.info(f"Ascending/descending to altitude {self.height_m}")
-        from pymavlink.dialects.v20.ardupilotmega import (
-            MAVLink,
-            MAV_CMD_GUIDED_CHANGE_ALTITUDE,
-        )
-
         mav: MAVLink = mavlink_connection.mav
         mav.command_long_send(
             target_system=mavlink_connection.target_system,
@@ -115,42 +118,43 @@ class ChangeAltitude(Command):
         )
 
 
-class ChangeHeading(Command):
-    def __init__(self, heading: float, rate_of_change: float = 1.0) -> None:
+class SetAttitude(Command):
+    HOLD_ALTITUDE_THRUST = (
+        0.5  # Setting the thrust to this value tells holds a constant altitude
+    )
+
+    def __init__(self, heading: float, pitch: float, roll: float) -> None:
         """
-        Change to target heading at a given rate, overriding previous heading/s. This slews the vehicle at a
-        controllable rate between it's previous heading and the new one. (affects GUIDED only. Exiting GUIDED returns
-        aircraft to normal behaviour defined elsewhere.
-        :param heading:
-        :param rate_of_change:
+        Sets a desired vehicle attitude. Used by an external controller to command the vehicle (manual controller or
+        other system).
+        Primarily used in GUIDED_NOGPS mode.
+
+        See https://ardupilot.org/dev/docs/copter-commands-in-guided-mode.html#copter-commands-in-guided-mode-set-attitude-target
+        and here https://mavlink.io/en/messages/common.html#SET_ATTITUDE_TARGET
+
+        TODO should this hold altitude or not touch the thrust?
         """
-        # TODO choose a sane default rate_of_change
         super().__init__()
         assert 0 <= heading < 360
         self.heading = heading
-        self.rate_of_change = rate_of_change
+        self.pitch = pitch
+        self.roll = roll
+        self.attitude = [self.roll, self.pitch, self.heading]
 
     def __call__(self, mavlink_connection: mavfile) -> None:
-        logging.info(f"Turning to heading {self.heading}")
-        from pymavlink.dialects.v20.ardupilotmega import (
-            MAVLink,
-            MAV_CMD_GUIDED_CHANGE_HEADING,
-            HEADING_TYPE_HEADING,
-        )
-
         mav: MAVLink = mavlink_connection.mav
-        mav.command_long_send(
+        mav.set_attitude_target_send(
+            time_boot_ms=int(time.monotonic() * 1000),
             target_system=mavlink_connection.target_system,
             target_component=mavlink_connection.target_component,
-            command=MAV_CMD_GUIDED_CHANGE_HEADING,
-            confirmation=0,
-            param1=HEADING_TYPE_HEADING,
-            param2=self.heading,
-            param3=self.rate_of_change,
-            param4=0.0,
-            param5=0.0,
-            param6=0.0,
-            param7=0.0,
+            type_mask=ATTITUDE_TARGET_TYPEMASK_BODY_PITCH_RATE_IGNORE
+            | ATTITUDE_TARGET_TYPEMASK_BODY_YAW_RATE_IGNORE
+            | ATTITUDE_TARGET_TYPEMASK_BODY_ROLL_RATE_IGNORE,
+            q=euler_to_quat(self.attitude),
+            body_roll_rate=0,
+            body_pitch_rate=0,
+            body_yaw_rate=0,
+            thrust=self.HOLD_ALTITUDE_THRUST,
         )
 
 

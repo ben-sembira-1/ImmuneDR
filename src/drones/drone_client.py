@@ -19,6 +19,8 @@ from pymavlink.dialects.v20.ardupilotmega import (
     MAVLink_local_position_ned_message,
     MAVLink_global_position_int_message,
 )
+from pymavlink.mavextra import angle_diff
+
 from async_state_machine.client import _ClientEventReaderFactory
 from async_state_machine.transitions.combinators import all_of
 from async_state_machine.transitions.types import (
@@ -31,11 +33,10 @@ from drones.commands import (
     CommandSender,
     SetFlightMode,
     Takeoff,
-    ChangeHeading,
     ChangeAltitude,
+    SetAttitude,
 )
 from drones.mavlink_types import FlightMode, LocalPositionNED, GlobalPositionInt
-from drones.navigation_utils import angle_diff
 
 
 def _is_heartbeat(message: MAVLink_message) -> bool:
@@ -243,7 +244,7 @@ class DroneClient:
     ) -> TransitionCheckerFactory:
         return ActAndWaitForCheckerFactory(
             action_callback=lambda: self._commands_queue_tx.send(
-                ChangeHeading(heading)
+                SetAttitude(heading=heading, pitch=0, roll=0)
             ),
             wait_for=self.when_heading(
                 lambda p: abs(angle_diff(heading, p.heading_deg)) <= allowed_error_deg

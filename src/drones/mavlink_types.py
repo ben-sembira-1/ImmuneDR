@@ -12,6 +12,7 @@ class FlightMode(Enum):
 
     GUIDED = 4
     LAND = 9
+    GUIDED_NO_GPS = 20
 
 
 @dataclass
