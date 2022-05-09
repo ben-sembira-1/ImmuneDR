@@ -2,13 +2,25 @@ from collections import Counter
 from dataclasses import dataclass
 import logging
 import signal
-from typing import Dict, Iterator, Optional, Generator
+from typing import Dict, Iterator, Optional, Generator, Mapping, cast
 from pathlib import Path
 from contextlib import contextmanager
 import os
 from subprocess import Popen
 import pymavlink.mavutil
-from pyparsing import Mapping
+from pymavlink.mavutil import mavfile
+from pymavlink.dialects.v20.ardupilotmega import (
+    MAVLink_message,
+    MAVLink_gps_raw_int_message,
+    GPS_FIX_TYPE_NO_FIX,
+)
+
+from async_state_machine.transitions.types import TransitionCheckerFactory
+
+from drones.commands import Command
+
+from drones.drone_client import ActAndWaitForCheckerFactory, DroneClient
+from drones.drone_daemon import DroneDaemon
 
 PREALLOCATED_SIMULATION_PORTS = {5763}
 
@@ -28,6 +40,33 @@ class TcpSerialConnectionDef:
 
     def as_pymavlink_connection_argument(self) -> str:
         return f"tcp:{self.host}:{self.port}"
+
+
+def _gps_fix_is_no_fix(message: MAVLink_message) -> Optional[bool]:
+    if message.get_msgId() != MAVLink_gps_raw_int_message.id:
+        return None
+    assert isinstance(message, MAVLink_gps_raw_int_message)
+    logging.debug(f"GPS raw int: {str(message)}")
+    return cast(bool, message.fix_type == GPS_FIX_TYPE_NO_FIX)
+
+
+class TurnOffGps(Command):
+    def __call__(self, mavlink_connection: mavfile) -> None:
+        logging.info("Turning off GPS")
+        mavlink_connection.param_set_send("SIM_GPS_DISABLE", 1)
+
+
+class SimulationDroneClient(DroneClient):
+    def turn_off_gps(self) -> TransitionCheckerFactory:
+        return ActAndWaitForCheckerFactory(
+            action_callback=lambda: self._commands_queue_tx.send(TurnOffGps()),
+            wait_for=self._event_client.when(_gps_fix_is_no_fix),
+        )
+
+
+class SimulationDroneDaemon(DroneDaemon):
+    def create_client(self) -> SimulationDroneClient:
+        return SimulationDroneClient(self._sender_client.events(), self._command_sender)
 
 
 class _RunningSimulation:

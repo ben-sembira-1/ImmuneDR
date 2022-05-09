@@ -5,6 +5,7 @@ from typing import Dict
 from pymavlink.mavutil import mavfile
 from pymavlink.dialects.v20.ardupilotmega import (
     MAVLink,
+    MAVLink_gps_raw_int_message,
     MAVLink_message,
     MAVLink_ekf_status_report_message,
     MAVLink_local_position_ned_message,
@@ -20,6 +21,7 @@ MESSAGES_INTERVAL_US: Dict[MAVLink_message, float] = {
     MAVLink_ekf_status_report_message: 10_000.0,
     MAVLink_local_position_ned_message: 10_000.0,
     MAVLink_global_position_int_message: 10_000.0,
+    MAVLink_gps_raw_int_message: 1_000_000.0,
 }
 
 

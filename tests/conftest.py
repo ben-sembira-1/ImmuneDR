@@ -9,9 +9,7 @@ import pytest
 
 from tests.state_machine_utils import run_until
 from tests.takeoff_state_machine import get_takeoff_state_machine, TakeoffStateNames
-from drones.drone_client import DroneClient
-from drones.drone_daemon import DroneDaemon
-from drones.testing import TcpSerialConnectionDef, simulation_context
+from drones.testing import TcpSerialConnectionDef, simulation_context, SimulationDroneDaemon, SimulationDroneClient
 
 
 @pytest.fixture
@@ -43,8 +41,8 @@ def mavlink_connection(tmpdir: str) -> pymavlink.mavutil.mavfile:
 @pytest.fixture(scope="function")
 def sim_drone(
     mavlink_connection: pymavlink.mavutil.mavfile,
-) -> Generator[DroneClient, None, None]:
-    daemon = DroneDaemon(mavlink_connection=mavlink_connection)
+) -> Generator[SimulationDroneClient, None, None]:
+    daemon = SimulationDroneDaemon(mavlink_connection=mavlink_connection)
     client = daemon.create_client()
     try:
         yield client
@@ -53,7 +51,7 @@ def sim_drone(
 
 
 @pytest.fixture
-def flying_sim_drone(sim_drone: DroneClient) -> DroneClient:
+def flying_sim_drone(sim_drone: SimulationDroneClient) -> SimulationDroneClient:
     """
     Returns a DroneClient after takeoff
     """
