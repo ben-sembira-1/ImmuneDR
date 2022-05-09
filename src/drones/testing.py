@@ -1,3 +1,4 @@
+import enum
 from collections import Counter
 from dataclasses import dataclass
 import logging
@@ -25,6 +26,13 @@ from drones.drone_daemon import DroneDaemon
 PREALLOCATED_SIMULATION_PORTS = {5763}
 
 
+class Parameter(enum.Enum):
+    SYSID_MYGCS = enum.auto()
+    FS_EKF_ACTION = enum.auto()
+    SIM_GPS_DISABLE = enum.auto()
+    SIM_RC_FAIL = enum.auto()
+
+
 @dataclass
 class TcpSerialConnectionDef:
     """Represents a tcp connection configuration to the simulation.
@@ -50,10 +58,19 @@ def _gps_fix_is_no_fix(message: MAVLink_message) -> Optional[bool]:
     return cast(bool, message.fix_type == GPS_FIX_TYPE_NO_FIX)
 
 
-class TurnOffGps(Command):
+class SetParameter(Command):
+    def __init__(self, parameter: Parameter, value):
+        super().__init__()
+        self.parameter = parameter
+        self.value = value
+
     def __call__(self, mavlink_connection: mavfile) -> None:
-        logging.info("Turning off GPS")
-        mavlink_connection.param_set_send("SIM_GPS_DISABLE", 1)
+        mavlink_connection.param_set_send(self.parameter.name, self.value)
+
+
+class TurnOffGps(SetParameter):
+    def __init__(self):
+        super(TurnOffGps, self).__init__(Parameter.SIM_GPS_DISABLE, 1)
 
 
 class SimulationDroneClient(DroneClient):

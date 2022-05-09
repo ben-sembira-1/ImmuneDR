@@ -4,7 +4,7 @@ from async_state_machine import StateMachine, State
 from async_state_machine.transitions.timeout import timeout
 
 from drones.drone_client import DroneClient
-from drones.drone_daemon import disable_gps
+from drones.testing import SimulationDroneClient
 
 from tests.state_machine_utils import run_until
 from tests.takeoff_state_machine import get_takeoff_state_machine, TakeoffStateNames
@@ -99,10 +99,11 @@ def test_land(flying_sim_drone: DroneClient):
     run_until(sm, target=StateNames.DONE, error_states={StateNames.ERROR})
 
 
-def test_disable_gps(flying_sim_drone: DroneClient, mavlink_connection):
+def test_disable_gps(flying_sim_drone: SimulationDroneClient, mavlink_connection):
     @enum.unique
     class StateNames(enum.Enum):
         FLYING = "Flying"
+        TURNING_OFF_GPS = "Disabling GPS"
         NO_GPS = "Lost GPS"
         ERROR = "Error"
 
@@ -110,6 +111,13 @@ def test_disable_gps(flying_sim_drone: DroneClient, mavlink_connection):
         [
             State(
                 name=StateNames.FLYING,
+                transitions={
+                    StateNames.TURNING_OFF_GPS: flying_sim_drone.turn_off_gps(),
+                    StateNames.ERROR: timeout(secs=5),
+                },
+            ),
+            State(
+                name=StateNames.TURNING_OFF_GPS,
                 transitions={
                     StateNames.NO_GPS: flying_sim_drone.ekf_bad(),
                     StateNames.ERROR: timeout(secs=5),
@@ -120,7 +128,6 @@ def test_disable_gps(flying_sim_drone: DroneClient, mavlink_connection):
         ]
     )
 
-    disable_gps(mavlink_connection)
     run_until(sm, target=StateNames.NO_GPS, error_states={StateNames.ERROR})
 
 

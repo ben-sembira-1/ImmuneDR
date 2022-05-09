@@ -1,4 +1,3 @@
-import enum
 import logging
 from threading import Event, Thread
 from typing import Dict
@@ -23,13 +22,6 @@ MESSAGES_INTERVAL_US: Dict[MAVLink_message, float] = {
     MAVLink_global_position_int_message: 10_000.0,
     MAVLink_gps_raw_int_message: 1_000_000.0,
 }
-
-
-class Parameter(enum.Enum):
-    SYSID_MYGCS = enum.auto()
-    FS_EKF_ACTION = enum.auto()
-    SIM_GPS_DISABLE = enum.auto()
-    SIM_RC_FAIL = enum.auto()
 
 
 def _mavlink_control_loop(
@@ -115,11 +107,3 @@ class DroneDaemon:
     def __del__(self) -> None:
         self._stop_loop_event.set()
         self._thread.join(10)
-
-
-def set_parameter(mavlink_connection: mavfile, parameter: Parameter, value):
-    mavlink_connection.param_set_send(parameter.name, value)
-
-
-def disable_gps(mavlink_connection: mavfile) -> None:
-    set_parameter(mavlink_connection, Parameter.SIM_GPS_DISABLE, 1)
