@@ -2,7 +2,7 @@ import enum
 import logging
 from threading import Event, Thread
 from typing import Dict
-from pymavlink.mavutil import mavfile, mavlink
+from pymavlink.mavutil import mavfile
 from pymavlink.dialects.v20.ardupilotmega import (
     MAVLink,
     MAVLink_message,
