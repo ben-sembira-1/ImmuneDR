@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from enum import Enum
 
+import numpy as np
+
 
 class FlightMode(Enum):
     """
@@ -10,6 +12,7 @@ class FlightMode(Enum):
     values
     """
 
+    ALT_HOLD = 2
     GUIDED = 4
     LAND = 9
     GUIDED_NO_GPS = 20
@@ -46,3 +49,41 @@ class GlobalPositionInt:
     @property
     def heading_deg(self) -> float:
         return self.heading_cdeg / 100
+
+
+@dataclass
+class AttitudeMessage:
+    """
+    The attitude in the aeronautical frame (right-handed, Z-down, X-front, Y-right).
+
+    https://mavlink.io/en/messages/common.html#ATTITUDE
+    """
+
+    time_boot_ms: int
+    roll_rad: float
+    pitch_rad: float
+    yaw_rad: float
+    roll_speed: float  # rad/s
+    pitch_speed: float  # rad/s
+    yaw_speed: float  # rad/s
+
+    @property
+    def roll_deg(self) -> float:
+        """
+        From 0 to 360 degrees
+        """
+        return np.rad2deg(self.roll_rad) % 360
+
+    @property
+    def pitch_deg(self) -> float:
+        """
+        From 0 to 360 degrees
+        """
+        return np.rad2deg(self.pitch_rad) % 360
+
+    @property
+    def yaw_deg(self) -> float:
+        """
+        From 0 to 360 degrees
+        """
+        return np.rad2deg(self.yaw_rad) % 360

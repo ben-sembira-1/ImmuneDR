@@ -142,6 +142,7 @@ class SetAttitude(Command):
         self.attitude = [self.roll, self.pitch, self.heading]
 
     def __call__(self, mavlink_connection: mavfile) -> None:
+        logging.debug(f"Setting attitude: {self.attitude}")
         mav: MAVLink = mavlink_connection.mav
         mav.set_attitude_target_send(
             time_boot_ms=int(time.monotonic() * 1000),

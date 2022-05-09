@@ -17,7 +17,7 @@ from pymavlink.dialects.v20.ardupilotmega import (
     MAVLink_statustext_message,
     MAVLink_ekf_status_report_message,
     MAVLink_local_position_ned_message,
-    MAVLink_global_position_int_message,
+    MAVLink_attitude_message,
 )
 from pymavlink.mavextra import angle_diff
 
@@ -36,7 +36,11 @@ from drones.commands import (
     ChangeAltitude,
     SetAttitude,
 )
-from drones.mavlink_types import FlightMode, LocalPositionNED, GlobalPositionInt
+from drones.mavlink_types import (
+    FlightMode,
+    LocalPositionNED,
+    AttitudeMessage,
+)
 
 
 def _is_heartbeat(message: MAVLink_message) -> bool:
@@ -122,21 +126,19 @@ def _get_local_position(message: MAVLink_message) -> Optional[LocalPositionNED]:
     )
 
 
-def _get_global_position_int(message: MAVLink_message) -> Optional[GlobalPositionInt]:
-    if message.get_msgId() != MAVLink_global_position_int_message.id:
+def _get_attitude(message: MAVLink_message) -> Optional[AttitudeMessage]:
+    if message.get_msgId() != MAVLink_attitude_message.id:
         return None
-    assert isinstance(message, MAVLink_global_position_int_message)
-    logging.debug(f"Global position: {message}")
-    return GlobalPositionInt(
+    assert isinstance(message, MAVLink_attitude_message)
+    logging.debug(f"Attitude: {str(message)}")
+    return AttitudeMessage(
         time_boot_ms=message.time_boot_ms,
-        latitude=message.lat,
-        longitude=message.lon,
-        altitude=message.alt,
-        altitude_above_ground=message.relative_alt,
-        vx=message.vx,
-        vy=message.vy,
-        vz=message.vz,
-        heading_cdeg=message.hdg,
+        roll_rad=message.roll,
+        pitch_rad=message.pitch,
+        yaw_rad=message.yaw,
+        roll_speed=message.rollspeed,
+        pitch_speed=message.pitchspeed,
+        yaw_speed=message.yawspeed,
     )
 
 
@@ -204,12 +206,12 @@ class DroneClient:
             else None
         )
 
-    def when_heading(
-        self, condition: Callable[[GlobalPositionInt], Optional[bool]]
+    def when_attitude(
+        self, condition: Callable[[AttitudeMessage], Optional[bool]]
     ) -> TransitionCheckerFactory:
         return self._event_client.when(
-            lambda m: condition(cast(GlobalPositionInt, _get_global_position_int(m)))
-            if _get_global_position_int(m) is not None
+            lambda m: condition(_get_attitude(m))
+            if _get_attitude(m) is not None
             else None
         )
 
@@ -242,13 +244,11 @@ class DroneClient:
         heading: float,
         allowed_error_deg: float = 5.0,
     ) -> TransitionCheckerFactory:
-        return ActAndWaitForCheckerFactory(
-            action_callback=lambda: self._commands_queue_tx.send(
-                SetAttitude(heading=heading, pitch=0, roll=0)
-            ),
-            wait_for=self.when_heading(
-                lambda p: abs(angle_diff(heading, p.heading_deg)) <= allowed_error_deg
-            ),
+        return self.set_attitude(
+            heading_deg=heading,
+            allowed_error_deg=allowed_error_deg,
+            pitch_deg=0,
+            roll_deg=0,
         )
 
     def land(self) -> TransitionCheckerFactory:
@@ -261,3 +261,23 @@ class DroneClient:
 
     def dr_cancelled(self) -> TransitionCheckerFactory:
         return self._event_client.when(_is_cancel_dr)
+
+    def set_attitude(
+        self,
+        pitch_deg: float,
+        heading_deg: float,
+        roll_deg: float = 0,
+        allowed_error_deg: float = 3.0,
+    ):
+        return ActAndWaitForCheckerFactory(
+            action_callback=lambda: self._commands_queue_tx.send(
+                SetAttitude(heading=heading_deg, pitch=pitch_deg, roll=roll_deg)
+            ),
+            wait_for=self.when_attitude(
+                lambda p: (
+                    (abs(angle_diff(pitch_deg, p.pitch_deg)) <= allowed_error_deg)
+                    and (abs(angle_diff(roll_deg, p.roll_deg)) <= allowed_error_deg)
+                    and (abs(angle_diff(heading_deg, p.yaw_deg)) <= allowed_error_deg)
+                )
+            ),
+        )
