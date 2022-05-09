@@ -9,7 +9,12 @@ import pytest
 
 from tests.state_machine_utils import run_until
 from tests.takeoff_state_machine import get_takeoff_state_machine, TakeoffStateNames
-from drones.testing import TcpSerialConnectionDef, simulation_context, SimulationDroneDaemon, SimulationDroneClient
+from drones.testing import (
+    TcpSerialConnectionDef,
+    simulation_context,
+    SimulationDroneDaemon,
+    SimulationDroneClient,
+)
 
 
 @pytest.fixture
