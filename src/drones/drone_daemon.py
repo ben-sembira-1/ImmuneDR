@@ -30,14 +30,6 @@ class Parameter(enum.Enum):
     SIM_RC_FAIL = enum.auto()
 
 
-PARAMETER_TYPES = {
-    Parameter.SYSID_MYGCS: mavlink.MAV_PARAM_TYPE_UINT8,
-    Parameter.FS_EKF_ACTION: mavlink.MAV_PARAM_TYPE_UINT8,
-    Parameter.SIM_GPS_DISABLE: mavlink.MAV_PARAM_TYPE_UINT8,
-    Parameter.SIM_RC_FAIL: mavlink.MAV_PARAM_TYPE_UINT8,
-}
-
-
 def _mavlink_control_loop(
     mavlink_connection: mavfile,
     sender_client: Client[MAVLink_message],
@@ -124,15 +116,7 @@ class DroneDaemon:
 
 
 def set_parameter(mavlink_connection: mavfile, parameter: Parameter, value):
-    mav: MAVLink = mavlink_connection.mav
-
-    mav.param_set_send(
-        target_system=mavlink_connection.target_system,
-        target_component=mavlink_connection.target_component,
-        param_id=parameter.name.encode("utf-8"),
-        param_value=value,
-        param_type=PARAMETER_TYPES[parameter],
-    )
+    mavlink_connection.param_set_send(parameter.name, value)
 
 
 def disable_gps(mavlink_connection: mavfile) -> None:
