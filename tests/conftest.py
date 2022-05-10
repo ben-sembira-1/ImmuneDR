@@ -1,6 +1,7 @@
 import logging
 import os
 import random
+from shutil import copyfile
 from pathlib import Path
 from typing import Generator
 
@@ -19,6 +20,9 @@ from drones.testing import (
 
 @pytest.fixture
 def mavlink_connection(tmpdir: str) -> pymavlink.mavutil.mavfile:
+    tmpdir = Path(tmpdir)
+    parm_file_path_in_sim_dir = Path(tmpdir) / "mav.parm"
+    copyfile("./tests/assets/mav.parm", parm_file_path_in_sim_dir)
     port = random.randrange(5900, 6100)
     logging.info(f"Using random tcp port {port} for simulation connection")
     serial_ports_override = {}
@@ -34,8 +38,9 @@ def mavlink_connection(tmpdir: str) -> pymavlink.mavutil.mavfile:
         port=port, wait_for_connection=True
     )
     with simulation_context(
-        cwd=Path(tmpdir),
+        cwd=tmpdir,
         serial_ports_override=serial_ports_override,
+        parameter_file=parm_file_path_in_sim_dir,
     ) as sim:
         mavlink = sim.mavlink_connect_to_serial(0)
         mavlink.wait_heartbeat(timeout=500)

@@ -131,6 +131,7 @@ def simulation_context(
     *,
     cwd: Optional[Path] = None,
     serial_ports_override: Optional[Dict[int, TcpSerialConnectionDef]],
+    parameter_file: Optional[Path] = None,
     speedup: int = 1,
 ) -> Generator[_RunningSimulation, None, None]:
     """
@@ -144,6 +145,8 @@ def simulation_context(
     SIM_VEHICLE_PATH = os.environ.get(
         "SIM_VEHICLE_PATH", "/home/pilot/ardupilot/Tools/autotest/sim_vehicle.py"
     )
+    if parameter_file is not None:
+        assert parameter_file.is_file(), f"The parameter file {parameter_file} path is not a file"
 
     assert all(
         con_def.port.bit_length() <= 16 for con_def in serial_ports.values()
@@ -175,6 +178,8 @@ def simulation_context(
         "--speedup",
         str(speedup),
     ]
+    if parameter_file is not None:
+        sitl_args.extend(['--add-param-file', parameter_file])
 
     if len(args_to_binary) > 1:
         sitl_args.extend(args_to_binary)
