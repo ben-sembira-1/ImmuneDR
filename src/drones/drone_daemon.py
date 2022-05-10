@@ -12,6 +12,11 @@ from pymavlink.dialects.v20.ardupilotmega import (
     MAVLink_attitude_message,
     MAVLink_global_position_int_message,
     MAVLink_attitude_target_message,
+    MAVLink_statustext_message,
+    MAV_SEVERITY_CRITICAL,
+    MAV_SEVERITY_ERROR,
+    MAV_SEVERITY_WARNING,
+    MAV_SEVERITY_NOTICE,
 )
 from async_state_machine.client import Client
 
@@ -26,6 +31,20 @@ MESSAGES_INTERVAL_US: Dict[MAVLink_message, float] = {
     MAVLink_global_position_int_message: 100_000.0,
     MAVLink_attitude_target_message: 100_000.0,
 }
+
+
+def _log_statustext_message(msg: MAVLink_statustext_message) -> None:
+    if msg.severity <= MAV_SEVERITY_CRITICAL:
+        level = logging.CRITICAL
+    elif msg.severity <= MAV_SEVERITY_ERROR:
+        level = logging.ERROR
+    elif msg.severity <= MAV_SEVERITY_WARNING:
+        level = logging.WARNING
+    elif msg.severity <= MAV_SEVERITY_NOTICE:
+        level = logging.INFO
+    else:
+        level = logging.DEBUG
+    logging.log(level, f"Received status message: {msg.text}")
 
 
 def _mavlink_control_loop(
@@ -61,7 +80,10 @@ def _mavlink_control_loop(
         while not stop_loop.is_set():
             msg = mavlink_connection.recv_msg()
             if msg is not None:
-                logging.debug(f"drone daemon received mavlink message: {msg}")
+                if msg.get_msgId() == MAVLink_statustext_message.id:
+                    _log_statustext_message(msg)
+                else:
+                    logging.debug(f"drone daemon received mavlink message: {msg}")
                 sender_client.to_state_machine(msg)
             cmd = command_rx_queue.receive()
             if cmd is not None:
