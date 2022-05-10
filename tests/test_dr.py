@@ -35,5 +35,6 @@ def test_drone_dr(
             dr_state_machine,
             target=state,
             error_states={DRStateNames.ERROR, DRStateNames.IN_THE_AIR},
+            timeout=timedelta(seconds=5),
         )
         logging.info(f"Reached state {state}")

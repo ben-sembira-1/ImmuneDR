@@ -1,9 +1,11 @@
 import enum
+from datetime import timedelta
 
 from async_state_machine import StateMachine, State
 from async_state_machine.transitions.timeout import timeout
 
 from drones.drone_client import DroneClient
+from drones.mavlink_types import FlightMode
 from drones.testing import SimulationDroneClient
 
 from tests.state_machine_utils import run_until
@@ -67,10 +69,12 @@ def test_drone_armed(sim_drone: DroneClient) -> None:
 
 
 def test_drone_takeoff(sim_drone: DroneClient) -> None:
-    sm = get_takeoff_state_machine(sim_drone)
+    altitude = 15
+    sm = get_takeoff_state_machine(sim_drone, altitude)
     run_until(
         sm, target=TakeoffStateNames.IN_THE_AIR, error_states={TakeoffStateNames.ERROR}
     )
+    # TODO assert abs(sim_drone.sim_state.altitude_m - altitude) < 1
 
 
 def test_land(flying_sim_drone: DroneClient):
@@ -139,7 +143,6 @@ def test_turn(flying_sim_drone: DroneClient):
     class StateNames(enum.Enum):
         TURNING = "Turning"
         DONE = "Done turning"
-        ERROR = "Error"
 
     sm = StateMachine(
         [
@@ -147,15 +150,13 @@ def test_turn(flying_sim_drone: DroneClient):
                 name=StateNames.TURNING,
                 transitions={
                     StateNames.DONE: flying_sim_drone.turn(heading=0),
-                    StateNames.ERROR: timeout(secs=5),
                 },
             ),
             State(name=StateNames.DONE, transitions={}),
-            State(name=StateNames.ERROR, transitions={}),
         ]
     )
 
-    run_until(sm, target=StateNames.DONE, error_states={StateNames.ERROR})
+    run_until(sm, target=StateNames.DONE, timeout=timedelta(seconds=3))
 
 
 def test_change_altitude(flying_sim_drone: DroneClient):
@@ -165,7 +166,6 @@ def test_change_altitude(flying_sim_drone: DroneClient):
     class StateNames(enum.Enum):
         CHANGING_ALTITUDE = "Changing altitude"
         DONE = "Reached target altitude"
-        ERROR = "Error"
 
     sm = StateMachine(
         [
@@ -173,12 +173,44 @@ def test_change_altitude(flying_sim_drone: DroneClient):
                 name=StateNames.CHANGING_ALTITUDE,
                 transitions={
                     StateNames.DONE: flying_sim_drone.change_altitude(height_m=20),
-                    StateNames.ERROR: timeout(secs=10),
                 },
             ),
             State(name=StateNames.DONE, transitions={}),
-            State(name=StateNames.ERROR, transitions={}),
         ]
     )
 
-    run_until(sm, target=StateNames.DONE, error_states={StateNames.ERROR})
+    run_until(sm, target=StateNames.DONE, timeout=timedelta(seconds=3))
+
+
+def test_set_attitude(flying_sim_drone: DroneClient):
+    # TODO does this even work in GUIDED with GPS?
+    # TODO parametrize
+    @enum.unique
+    class StateNames(enum.Enum):
+        CHANGING_MODE = "Changing mode to GUIDED_NOGPS"
+        TURNING = "Turning"
+        DONE = "Done turning"
+
+    sm = StateMachine(
+        [
+            State(
+                name=StateNames.CHANGING_MODE,
+                transitions={
+                    StateNames.TURNING: flying_sim_drone.set_flight_mode(
+                        FlightMode.GUIDED_NO_GPS,
+                    ),
+                },
+            ),
+            State(
+                name=StateNames.TURNING,
+                transitions={
+                    StateNames.DONE: flying_sim_drone.set_attitude(
+                        heading_deg=0, pitch_deg=-5, roll_deg=0
+                    ),
+                },
+            ),
+            State(name=StateNames.DONE, transitions={}),
+        ]
+    )
+
+    run_until(sm, target=StateNames.DONE, timeout=timedelta(seconds=3))
