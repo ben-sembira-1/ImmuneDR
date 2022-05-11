@@ -50,6 +50,14 @@ class GlobalPositionInt:
     def heading_deg(self) -> float:
         return self.heading_cdeg / 100
 
+    @property
+    def height_m(self) -> float:
+        return self.altitude / 1000
+
+    @property
+    def height_above_ground_m(self) -> float:
+        return self.altitude_above_ground / 1000
+
 
 @dataclass
 class AttitudeMessage:
