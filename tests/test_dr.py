@@ -28,6 +28,7 @@ def test_drone_dr(
         DRStateNames.CLIMBING,
         DRStateNames.TURNING,
         DRStateNames.INBOUND,
+        DRStateNames.DESCENDING,
         DRStateNames.LANDED,
     ]:
         logging.info(f"Waiting for state {state}")
@@ -35,6 +36,6 @@ def test_drone_dr(
             dr_state_machine,
             target=state,
             error_states={DRStateNames.ERROR, DRStateNames.IN_THE_AIR},
-            timeout=timedelta(seconds=5),
+            timeout=timedelta(seconds=15),
         )
         logging.info(f"Reached state {state}")

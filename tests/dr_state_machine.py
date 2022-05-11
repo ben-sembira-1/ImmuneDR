@@ -1,5 +1,7 @@
 import enum
 
+from async_state_machine.transitions.combinators import all_of
+
 from async_state_machine import StateMachine, State
 from async_state_machine.transitions import timeout
 
@@ -17,6 +19,7 @@ class DRStateNames(enum.Enum):
     CLIMBING = "Climbing"
     TURNING = "Turning"
     INBOUND = "Inbound"
+    LEVELING = "Leveling"
     DESCENDING = "Descending"
     LANDING = "Landing"
     LANDED = "Landed"
@@ -47,7 +50,9 @@ def get_dr_state_machine(flying_sim_drone: DroneClient) -> StateMachine:
                     DRStateNames.TURNING: flying_sim_drone.when_global_position(
                         lambda p: abs(50 - p.height_above_ground_m) <= 5
                     ),
-                    DRStateNames.CLIMBING: flying_sim_drone.set_throttle(0.8),
+                    DRStateNames.CLIMBING: flying_sim_drone.set_throttle(
+                        0.8
+                    ),  # TODO speed?
                     DRStateNames.CANCELLING_DR: flying_sim_drone.dr_cancelled(),
                     # TODO what do we do if this times out? Probably want to DR anyway
                 },
@@ -65,11 +70,27 @@ def get_dr_state_machine(flying_sim_drone: DroneClient) -> StateMachine:
                 name=DRStateNames.INBOUND,
                 transitions={
                     # TODO calculate distance
-                    DRStateNames.DESCENDING: flying_sim_drone.set_attitude(
-                        pitch_deg=-15, heading_deg=15, end_condition=timeout(secs=3)
+                    DRStateNames.LEVELING: all_of(
+                        [
+                            timeout(secs=3),
+                            flying_sim_drone.set_attitude(
+                                pitch_deg=-15,
+                                heading_deg=15,
+                                # end_condition=timeout(secs=3)
+                            ),
+                        ]
                     ),
-                    DRStateNames.CANCELLING_DR: flying_sim_drone.dr_cancelled(),
+                    DRStateNames.CANCELLING_DR: flying_sim_drone.dr_cancelled(),  # Level out?
                     # TODO what do we do if this times out?
+                },
+            ),
+            State(
+                name=DRStateNames.LEVELING,
+                transitions={
+                    DRStateNames.DESCENDING: flying_sim_drone.set_attitude(
+                        heading_deg=15, pitch_deg=0
+                    ),
+                    # TODO cancellable?
                 },
             ),
             State(
@@ -78,7 +99,9 @@ def get_dr_state_machine(flying_sim_drone: DroneClient) -> StateMachine:
                     DRStateNames.LANDING: flying_sim_drone.when_global_position(
                         lambda p: abs(15 - p.height_above_ground_m) <= 3,
                     ),
-                    DRStateNames.DESCENDING: flying_sim_drone.set_throttle(0.35),
+                    DRStateNames.DESCENDING: flying_sim_drone.set_throttle(
+                        0.2
+                    ),  # TODO speed?
                     DRStateNames.CANCELLING_DR: flying_sim_drone.dr_cancelled(),
                     # TODO what do we do if this times out?
                 },

@@ -214,11 +214,7 @@ class ActUntilChecker(TransitionChecker):
         self.last_action_timestamp = -math.inf
 
     def poll_should_make_transition(self) -> Optional[bool]:
-        # logging.info(
-        #     f"AAAAAAAAA {self.end_condition.current_time}, {self.end_condition.timeout}, {time.time()}"
-        # )
         should_end = self.end_condition.poll_should_make_transition()
-        # logging.info(f"BBBBBBBBB {should_end}")
         if should_end:
             return True
         current_time = time.monotonic()
