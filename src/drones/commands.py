@@ -5,6 +5,7 @@ import logging
 from math import nan
 from typing import Deque, Optional, Protocol, Tuple
 
+import numpy as np
 from pymavlink.mavextra import euler_to_quat
 from pymavlink.mavutil import mavfile
 from pymavlink.dialects.v20.ardupilotmega import (
@@ -123,7 +124,7 @@ class SetAttitude(Command):
         0.5  # Setting the thrust to this value tells holds a constant altitude
     )
 
-    def __init__(self, heading: float, pitch: float, roll: float) -> None:
+    def __init__(self, heading_deg: float, pitch_deg: float, roll_deg: float) -> None:
         """
         Sets a desired vehicle attitude. Used by an external controller to command the vehicle (manual controller or
         other system).
@@ -135,11 +136,11 @@ class SetAttitude(Command):
         TODO should this hold altitude or not touch the thrust?
         """
         super().__init__()
-        assert 0 <= heading < 360
-        self.heading = heading
-        self.pitch = pitch
-        self.roll = roll
-        self.attitude = [self.roll, self.pitch, self.heading]
+        assert 0 <= heading_deg < 360
+        self.heading_deg = heading_deg
+        self.pitch_deg = pitch_deg
+        self.roll_deg = roll_deg
+        self.attitude = np.deg2rad([self.roll_deg, self.pitch_deg, self.heading_deg])
 
     def __call__(self, mavlink_connection: mavfile) -> None:
         logging.debug(f"Setting attitude: {self.attitude}")
