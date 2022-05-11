@@ -1,4 +1,7 @@
 import logging
+import math
+import time
+from datetime import timedelta
 from typing import Callable, Optional, cast
 
 from pymavlink.dialects.v20.ardupilotmega import (
@@ -18,10 +21,12 @@ from pymavlink.dialects.v20.ardupilotmega import (
     MAVLink_ekf_status_report_message,
     MAVLink_local_position_ned_message,
     MAVLink_attitude_message,
+    MAVLink_global_position_int_message,
 )
 from pymavlink.mavextra import angle_diff
 
 from async_state_machine.client import _ClientEventReaderFactory
+from async_state_machine.transitions import timeout
 from async_state_machine.transitions.combinators import all_of
 from async_state_machine.transitions.types import (
     TransitionCheckerFactory,
@@ -35,11 +40,13 @@ from drones.commands import (
     Takeoff,
     ChangeAltitude,
     SetAttitude,
+    SetThrottle,
 )
 from drones.mavlink_types import (
     FlightMode,
     LocalPositionNED,
     AttitudeMessage,
+    GlobalPositionInt,
 )
 
 
@@ -126,6 +133,24 @@ def _get_local_position(message: MAVLink_message) -> Optional[LocalPositionNED]:
     )
 
 
+def _get_global_position_int(message: MAVLink_message) -> Optional[GlobalPositionInt]:
+    if message.get_msgId() != MAVLink_global_position_int_message.id:
+        return None
+    assert isinstance(message, MAVLink_global_position_int_message)
+    logging.debug(f"Global position: {message}")
+    return GlobalPositionInt(
+        time_boot_ms=message.time_boot_ms,
+        latitude=message.lat,
+        longitude=message.lon,
+        altitude=message.alt,
+        altitude_above_ground=message.relative_alt,
+        vx=message.vx,
+        vy=message.vy,
+        vz=message.vz,
+        heading_cdeg=message.hdg,
+    )
+
+
 def _get_attitude(message: MAVLink_message) -> Optional[AttitudeMessage]:
     if message.get_msgId() != MAVLink_attitude_message.id:
         return None
@@ -142,6 +167,25 @@ def _get_attitude(message: MAVLink_message) -> Optional[AttitudeMessage]:
     )
 
 
+def _is_attitude_correct(
+    current_attitude: AttitudeMessage,
+    target_heading_deg: float,
+    target_pitch_deg: float,
+    target_roll_deg: float,
+    max_error_deg: float,
+) -> bool:
+    return (
+        abs(angle_diff(target_pitch_deg, current_attitude.pitch_deg)) <= max_error_deg
+        and (
+            abs(angle_diff(target_roll_deg, current_attitude.roll_deg)) <= max_error_deg
+        )
+        and (
+            abs(angle_diff(target_heading_deg, current_attitude.yaw_deg))
+            <= max_error_deg
+        )
+    )
+
+
 class ActAndWaitForCheckerFactory(TransitionCheckerFactory):
     def __init__(
         self, action_callback: Callable[[], None], wait_for: TransitionCheckerFactory
@@ -154,6 +198,55 @@ class ActAndWaitForCheckerFactory(TransitionCheckerFactory):
         logging.debug("Doing action before waiting for event")
         self.action_callback()
         return self.wait_for.create_checker()
+
+
+class ActUntilChecker(TransitionChecker):
+    def __init__(
+        self,
+        action_callback: Callable[[], None],
+        end_condition: TransitionCheckerFactory,
+        action_interval: timedelta,
+    ) -> None:
+        super().__init__()
+        self.action_callback = action_callback
+        self.end_condition = end_condition.create_checker()
+        self.action_interval = action_interval
+        self.last_action_timestamp = -math.inf
+
+    def poll_should_make_transition(self) -> Optional[bool]:
+        # logging.info(
+        #     f"AAAAAAAAA {self.end_condition.current_time}, {self.end_condition.timeout}, {time.time()}"
+        # )
+        should_end = self.end_condition.poll_should_make_transition()
+        # logging.info(f"BBBBBBBBB {should_end}")
+        if should_end:
+            return True
+        current_time = time.monotonic()
+        if (
+            current_time - self.last_action_timestamp
+            > self.action_interval.total_seconds()
+        ):
+            self.action_callback()
+            self.last_action_timestamp = current_time
+        return should_end
+
+
+class ActUntilFactory(TransitionCheckerFactory):
+    def __init__(
+        self,
+        action_callback: Callable[[], None],
+        end_condition: TransitionCheckerFactory,
+        action_interval: timedelta,
+    ) -> None:
+        super().__init__()
+        self.action_callback = action_callback
+        self.end_condition = end_condition
+        self.action_interval = action_interval
+
+    def create_checker(self) -> TransitionChecker:
+        return ActUntilChecker(
+            self.action_callback, self.end_condition, self.action_interval
+        )
 
 
 class DroneClient:
@@ -206,6 +299,15 @@ class DroneClient:
             else None
         )
 
+    def when_global_position(
+        self, condition: Callable[[GlobalPositionInt], Optional[bool]]
+    ) -> TransitionCheckerFactory:
+        return self._event_client.when(
+            lambda m: condition(cast(GlobalPositionInt, _get_global_position_int(m)))
+            if _get_global_position_int(m) is not None
+            else None
+        )
+
     def when_attitude(
         self, condition: Callable[[AttitudeMessage], Optional[bool]]
     ) -> TransitionCheckerFactory:
@@ -246,7 +348,7 @@ class DroneClient:
     ) -> TransitionCheckerFactory:
         return self.set_attitude(
             heading_deg=heading,
-            allowed_error_deg=allowed_error_deg,
+            max_error_deg=allowed_error_deg,
             pitch_deg=0,
             roll_deg=0,
         )
@@ -262,22 +364,42 @@ class DroneClient:
     def dr_cancelled(self) -> TransitionCheckerFactory:
         return self._event_client.when(_is_cancel_dr)
 
+    def set_throttle(self, throttle: float):
+        return ActAndWaitForCheckerFactory(
+            action_callback=lambda: self._commands_queue_tx.send(SetThrottle(throttle)),
+            wait_for=timeout(secs=0.1),
+        )
+
     def set_attitude(
         self,
         pitch_deg: float,
         heading_deg: float,
         roll_deg: float = 0,
-        allowed_error_deg: float = 3.0,
+        end_condition: Optional[TransitionCheckerFactory] = None,
+        max_error_deg: float = 3.0,
     ):
-        return ActAndWaitForCheckerFactory(
+        """
+        Sends SetAttitudeTarget commands. These commands time out after a short interval, so to hold a steady attitude
+        we need to keep resending the command.
+
+        If no end_condition is passed, the checker will trigger when the target attitude is reached.
+        If one is passed (e.g. a timeout), the command will be repeatedly sent until that condition is met.
+        """
+        end_condition = end_condition or self.when_attitude(
+            lambda p: _is_attitude_correct(
+                p,
+                target_heading_deg=heading_deg,
+                target_pitch_deg=pitch_deg,
+                target_roll_deg=roll_deg,
+                max_error_deg=max_error_deg,
+            )
+        )
+        return ActUntilFactory(
             action_callback=lambda: self._commands_queue_tx.send(
-                SetAttitude(heading=heading_deg, pitch=pitch_deg, roll=roll_deg)
-            ),
-            wait_for=self.when_attitude(
-                lambda p: (
-                    (abs(angle_diff(pitch_deg, p.pitch_deg)) <= allowed_error_deg)
-                    and (abs(angle_diff(roll_deg, p.roll_deg)) <= allowed_error_deg)
-                    and (abs(angle_diff(heading_deg, p.yaw_deg)) <= allowed_error_deg)
+                SetAttitude(
+                    heading_deg=heading_deg, pitch_deg=pitch_deg, roll_deg=roll_deg
                 )
             ),
+            end_condition=end_condition,
+            action_interval=timedelta(seconds=0.1),
         )

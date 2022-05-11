@@ -16,7 +16,6 @@ class DRStateNames(enum.Enum):
     GUIDED_NO_GPS = "Entering GUIDED_NOGPS Mode"
     CLIMBING = "Climbing"
     TURNING = "Turning"
-    PITCHING = "Pitching forward"
     INBOUND = "Inbound"
     DESCENDING = "Descending"
     LANDING = "Landing"
@@ -30,6 +29,7 @@ def get_dr_state_machine(flying_sim_drone: DroneClient) -> StateMachine:
                 name=DRStateNames.IN_THE_AIR,
                 transitions={
                     DRStateNames.GUIDED_NO_GPS: flying_sim_drone.ekf_bad(),
+                    # TODO Actually only when we lose connection
                 },
             ),
             State(
@@ -43,11 +43,11 @@ def get_dr_state_machine(flying_sim_drone: DroneClient) -> StateMachine:
             State(
                 name=DRStateNames.CLIMBING,
                 transitions={
-                    # TODO
-                    # DRStateNames.TURNING: flying_sim_drone.change_altitude(
-                    #     height_m=50
-                    # ),  # TODO const
-                    DRStateNames.TURNING: timeout(secs=3),
+                    # TODO const
+                    DRStateNames.TURNING: flying_sim_drone.when_global_position(
+                        lambda p: abs(50 - p.height_above_ground_m) <= 5
+                    ),
+                    DRStateNames.CLIMBING: flying_sim_drone.set_throttle(0.8),
                     DRStateNames.CANCELLING_DR: flying_sim_drone.dr_cancelled(),
                     # TODO what do we do if this times out? Probably want to DR anyway
                 },
@@ -55,26 +55,19 @@ def get_dr_state_machine(flying_sim_drone: DroneClient) -> StateMachine:
             State(
                 name=DRStateNames.TURNING,
                 transitions={
-                    DRStateNames.PITCHING: flying_sim_drone.turn(
+                    DRStateNames.INBOUND: flying_sim_drone.turn(
                         heading=15
                     ),  # TODO choose heading
                     DRStateNames.CANCELLING_DR: flying_sim_drone.dr_cancelled(),
                 },
             ),
             State(
-                name=DRStateNames.PITCHING,
-                transitions={
-                    DRStateNames.INBOUND: flying_sim_drone.set_attitude(
-                        pitch_deg=-3, heading_deg=15
-                    ),
-                    DRStateNames.CANCELLING_DR: flying_sim_drone.dr_cancelled(),
-                    # TODO what do we do if this times out?
-                },
-            ),
-            State(
                 name=DRStateNames.INBOUND,
                 transitions={
-                    DRStateNames.DESCENDING: timeout(secs=5),  # TODO calculate distance
+                    # TODO calculate distance
+                    DRStateNames.DESCENDING: flying_sim_drone.set_attitude(
+                        pitch_deg=-15, heading_deg=15, end_condition=timeout(secs=3)
+                    ),
                     DRStateNames.CANCELLING_DR: flying_sim_drone.dr_cancelled(),
                     # TODO what do we do if this times out?
                 },
@@ -82,11 +75,10 @@ def get_dr_state_machine(flying_sim_drone: DroneClient) -> StateMachine:
             State(
                 name=DRStateNames.DESCENDING,
                 transitions={
-                    # TODO
-                    # DRStateNames.LANDING: flying_sim_drone.change_altitude(
-                    #     height_m=10
-                    # ),  # TODO const
-                    DRStateNames.LANDING: timeout(secs=3),
+                    DRStateNames.LANDING: flying_sim_drone.when_global_position(
+                        lambda p: abs(15 - p.height_above_ground_m) <= 3,
+                    ),
+                    DRStateNames.DESCENDING: flying_sim_drone.set_throttle(0.35),
                     DRStateNames.CANCELLING_DR: flying_sim_drone.dr_cancelled(),
                     # TODO what do we do if this times out?
                 },
