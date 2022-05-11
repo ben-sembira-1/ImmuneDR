@@ -15,6 +15,7 @@ from pymavlink.dialects.v20.ardupilotmega import (
     ATTITUDE_TARGET_TYPEMASK_BODY_PITCH_RATE_IGNORE,
     ATTITUDE_TARGET_TYPEMASK_BODY_YAW_RATE_IGNORE,
     ATTITUDE_TARGET_TYPEMASK_BODY_ROLL_RATE_IGNORE,
+    ATTITUDE_TARGET_TYPEMASK_ATTITUDE_IGNORE,
 )
 
 from drones.mavlink_types import FlightMode
@@ -157,6 +158,33 @@ class SetAttitude(Command):
             body_pitch_rate=0,
             body_yaw_rate=0,
             thrust=self.HOLD_ALTITUDE_THRUST,
+        )
+
+
+class SetThrottle(Command):
+    def __init__(self, throttle: float) -> None:
+        """
+        Set the thrust using the SET_ATTITUDE_TARGET command (see SetAttitude for details).
+        """
+        super().__init__()
+        self.throttle = throttle
+
+    def __call__(self, mavlink_connection: mavfile) -> None:
+        logging.debug(f"Setting throttle: {self.throttle}")
+        mav: MAVLink = mavlink_connection.mav
+        mav.set_attitude_target_send(
+            time_boot_ms=int(time.monotonic() * 1000),
+            target_system=mavlink_connection.target_system,
+            target_component=mavlink_connection.target_component,
+            type_mask=ATTITUDE_TARGET_TYPEMASK_BODY_PITCH_RATE_IGNORE
+            | ATTITUDE_TARGET_TYPEMASK_BODY_YAW_RATE_IGNORE
+            | ATTITUDE_TARGET_TYPEMASK_BODY_ROLL_RATE_IGNORE
+            | ATTITUDE_TARGET_TYPEMASK_ATTITUDE_IGNORE,
+            q=[0, 0, 0, 0],
+            body_roll_rate=0,
+            body_pitch_rate=0,
+            body_yaw_rate=0,
+            thrust=self.throttle,
         )
 
 
