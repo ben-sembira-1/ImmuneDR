@@ -14,6 +14,7 @@ from pymavlink.dialects.v20.ardupilotmega import (
     MAVLink_message,
     MAVLink_gps_raw_int_message,
     GPS_FIX_TYPE_NO_FIX,
+    MAVLink_sim_state_message,
 )
 
 from async_state_machine.transitions.types import TransitionCheckerFactory
@@ -21,7 +22,7 @@ from async_state_machine.transitions.types import TransitionCheckerFactory
 from drones.commands import Command
 
 from drones.drone_client import ActAndWaitForCheckerFactory, DroneClient
-from drones.drone_daemon import DroneDaemon
+from drones.drone_daemon import DroneDaemon, MESSAGES_INTERVAL_US
 
 PREALLOCATED_SIMULATION_PORTS = {5763}
 
@@ -82,6 +83,20 @@ class SimulationDroneClient(DroneClient):
 
 
 class SimulationDroneDaemon(DroneDaemon):
+    def __init__(
+        self,
+        mavlink_connection: mavfile,
+        drone_system_id: int = 1,
+        drone_component_id: int = 1,
+    ):
+        message_intervals = {
+            **MESSAGES_INTERVAL_US,
+            MAVLink_sim_state_message: 10_000.0,
+        }
+        super().__init__(
+            mavlink_connection, drone_system_id, drone_component_id, message_intervals
+        )
+
     def create_client(self) -> SimulationDroneClient:
         return SimulationDroneClient(self._sender_client.events(), self._command_sender)
 
