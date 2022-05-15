@@ -48,7 +48,7 @@ def get_dr_state_machine(flying_sim_drone: DroneClient) -> StateMachine:
                 transitions={
                     # TODO const
                     DRStateNames.TURNING: flying_sim_drone.when_global_position(
-                        lambda p: abs(50 - p.height_above_ground_m) <= 5
+                        lambda p: p.height_above_ground_m >= 50
                     ),
                     DRStateNames.CLIMBING: flying_sim_drone.set_throttle(
                         0.8
@@ -97,7 +97,7 @@ def get_dr_state_machine(flying_sim_drone: DroneClient) -> StateMachine:
                 name=DRStateNames.DESCENDING,
                 transitions={
                     DRStateNames.LANDING: flying_sim_drone.when_global_position(
-                        lambda p: abs(15 - p.height_above_ground_m) <= 3,
+                        lambda p: p.height_above_ground_m <= 15
                     ),
                     DRStateNames.DESCENDING: flying_sim_drone.set_throttle(
                         0.2
@@ -127,5 +127,5 @@ def get_dr_state_machine(flying_sim_drone: DroneClient) -> StateMachine:
                 },
             ),
             State(name=DRStateNames.ERROR, transitions={}),
-        ]
+        ],
     )
