@@ -22,7 +22,8 @@ from drones.testing import (
 def mavlink_connection(tmpdir: str) -> pymavlink.mavutil.mavfile:
     tmpdir = Path(tmpdir)
     parm_file_path_in_sim_dir = Path(tmpdir) / "mav.parm"
-    copyfile("./tests/assets/mav.parm", parm_file_path_in_sim_dir)
+    reference_param_file = Path(__file__).parent / "assets" / "mav.parm"
+    copyfile(reference_param_file, parm_file_path_in_sim_dir)
     port = random.randrange(5900, 6100)
     logging.info(f"Using random tcp port {port} for simulation connection")
     serial_ports_override = {}
