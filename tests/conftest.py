@@ -20,8 +20,8 @@ from drones.testing import (
 
 @pytest.fixture
 def mavlink_connection(tmpdir: str) -> pymavlink.mavutil.mavfile:
-    tmpdir = Path(tmpdir)
-    parm_file_path_in_sim_dir = Path(tmpdir) / "mav.parm"
+    simulation_tmpdir = Path(tmpdir)
+    parm_file_path_in_sim_dir = Path(simulation_tmpdir) / "mav.parm"
     reference_param_file = Path(__file__).parent / "assets" / "mav.parm"
     copyfile(reference_param_file, parm_file_path_in_sim_dir)
     port = random.randrange(5900, 6100)
@@ -39,7 +39,7 @@ def mavlink_connection(tmpdir: str) -> pymavlink.mavutil.mavfile:
         port=port, wait_for_connection=True
     )
     with simulation_context(
-        cwd=tmpdir,
+        cwd=simulation_tmpdir,
         serial_ports_override=serial_ports_override,
         parameter_file=parm_file_path_in_sim_dir,
     ) as sim:

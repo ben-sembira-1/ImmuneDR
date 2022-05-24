@@ -60,7 +60,7 @@ def _gps_fix_is_no_fix(message: MAVLink_message) -> Optional[bool]:
 
 
 class SetParameter(Command):
-    def __init__(self, parameter: Parameter, value) -> None:
+    def __init__(self, parameter: Parameter, value: Union[float, int]) -> None:
         super().__init__()
         self.parameter = parameter
         self.value = value

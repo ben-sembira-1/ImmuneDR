@@ -352,7 +352,7 @@ class DroneClient:
     def dr_cancelled(self) -> TransitionCheckerFactory:
         return self._event_client.when(_is_cancel_dr)
 
-    def set_throttle(self, throttle: float):
+    def set_throttle(self, throttle: float) -> ActAndWaitForCheckerFactory:
         return ActAndWaitForCheckerFactory(
             action_callback=lambda: self._commands_queue_tx.send(SetThrottle(throttle)),
             wait_for=timeout(secs=0.1),
@@ -365,7 +365,7 @@ class DroneClient:
         roll_deg: float = 0,
         end_condition: Optional[TransitionCheckerFactory] = None,
         max_error_deg: float = 3.0,
-    ):
+    ) -> ActUntilFactory:
         """
         Sends SetAttitudeTarget commands. These commands time out after a short interval, so to hold a steady attitude
         we need to keep resending the command.
