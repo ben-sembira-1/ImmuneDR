@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from enum import Enum
+from typing import cast
 
 import numpy as np
 
@@ -80,18 +81,18 @@ class AttitudeMessage:
         """
         From 0 to 360 degrees
         """
-        return np.rad2deg(self.roll_rad) % 360
+        return cast(float, np.rad2deg(self.roll_rad)) % 360
 
     @property
     def pitch_deg(self) -> float:
         """
         From 0 to 360 degrees
         """
-        return np.rad2deg(self.pitch_rad) % 360
+        return cast(float, np.rad2deg(self.pitch_rad)) % 360
 
     @property
     def yaw_deg(self) -> float:
         """
         From 0 to 360 degrees
         """
-        return np.rad2deg(self.yaw_rad) % 360
+        return cast(float, np.rad2deg(self.yaw_rad)) % 360

@@ -18,7 +18,7 @@ class TakeoffStateNames(enum.Enum):
     ERROR = "Error"
 
 
-def get_takeoff_state_machine(sim_drone: DroneClient) -> StateMachine:
+def get_takeoff_state_machine(sim_drone: DroneClient, altitude: float = 15) -> StateMachine:
     return StateMachine(
         [
             State(
@@ -47,7 +47,7 @@ def get_takeoff_state_machine(sim_drone: DroneClient) -> StateMachine:
             State(
                 name=TakeoffStateNames.TAKING_OFF,
                 transitions={
-                    TakeoffStateNames.IN_THE_AIR: sim_drone.takeoff(height_m=15),
+                    TakeoffStateNames.IN_THE_AIR: sim_drone.takeoff(height_m=altitude),
                     TakeoffStateNames.ERROR: timeout(secs=25),
                 },
             ),

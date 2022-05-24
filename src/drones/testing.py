@@ -3,7 +3,7 @@ from collections import Counter
 from dataclasses import dataclass
 import logging
 import signal
-from typing import Dict, Iterator, Optional, Generator, Mapping, cast
+from typing import Dict, Iterator, Optional, Generator, Mapping, Union, cast
 from pathlib import Path
 from contextlib import contextmanager
 import os
@@ -60,7 +60,7 @@ def _gps_fix_is_no_fix(message: MAVLink_message) -> Optional[bool]:
 
 
 class SetParameter(Command):
-    def __init__(self, parameter: Parameter, value):
+    def __init__(self, parameter: Parameter, value) -> None:
         super().__init__()
         self.parameter = parameter
         self.value = value
@@ -70,7 +70,7 @@ class SetParameter(Command):
 
 
 class TurnOffGps(SetParameter):
-    def __init__(self):
+    def __init__(self) -> None:
         super(TurnOffGps, self).__init__(Parameter.SIM_GPS_DISABLE, 1)
 
 
@@ -144,7 +144,7 @@ def updated(dict: Dict, overlay: Mapping) -> Dict:
 @contextmanager
 def simulation_context(
     *,
-    cwd: Optional[Path] = None,
+    cwd: Optional[Union[Path, str]] = None,
     serial_ports_override: Optional[Dict[int, TcpSerialConnectionDef]],
     parameter_file: Optional[Path] = None,
     speedup: int = 1,
@@ -196,7 +196,7 @@ def simulation_context(
         str(speedup),
     ]
     if parameter_file is not None:
-        sitl_args.extend(["--add-param-file", parameter_file])
+        sitl_args.extend(["--add-param-file", str(parameter_file)])
 
     if len(args_to_binary) > 1:
         sitl_args.extend(args_to_binary)

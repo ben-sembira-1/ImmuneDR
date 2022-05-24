@@ -2,7 +2,7 @@ import logging
 import math
 import time
 from datetime import timedelta
-from typing import Callable, Optional, cast
+from typing import Callable, Optional, TypeVar, cast
 
 from pymavlink.dialects.v20.ardupilotmega import (
     MAVLink_message,
@@ -23,7 +23,9 @@ from pymavlink.dialects.v20.ardupilotmega import (
     MAVLink_attitude_message,
     MAVLink_global_position_int_message,
 )
-from pymavlink.mavextra import angle_diff
+from pymavlink.mavextra import angle_diff as untyped_angle_diff
+
+angle_diff = cast(Callable[[float, float], float], untyped_angle_diff)
 
 from async_state_machine.client import _ClientEventReaderFactory
 from async_state_machine.transitions import timeout
@@ -38,7 +40,6 @@ from drones.commands import (
     CommandSender,
     SetFlightMode,
     Takeoff,
-    ChangeAltitude,
     SetAttitude,
     SetThrottle,
 )
@@ -245,6 +246,15 @@ class ActUntilFactory(TransitionCheckerFactory):
         )
 
 
+T = TypeVar('T')
+R = TypeVar('R')
+
+def apply_on_not_none(func: Callable[[T], R], m: Optional[T]) -> Optional[R]:
+    if m is None:
+        return None
+    assert m is not None
+    return func(m)
+
 class DroneClient:
     _event_client: _ClientEventReaderFactory[MAVLink_message]
     _commands_queue_tx: CommandSender
@@ -290,27 +300,21 @@ class DroneClient:
         self, condition: Callable[[LocalPositionNED], Optional[bool]]
     ) -> TransitionCheckerFactory:
         return self._event_client.when(
-            lambda m: condition(cast(LocalPositionNED, _get_local_position(m)))
-            if _get_local_position(m) is not None
-            else None
+            lambda m: apply_on_not_none(condition, _get_local_position(m))
         )
 
     def when_global_position(
         self, condition: Callable[[GlobalPositionInt], Optional[bool]]
     ) -> TransitionCheckerFactory:
         return self._event_client.when(
-            lambda m: condition(cast(GlobalPositionInt, _get_global_position_int(m)))
-            if _get_global_position_int(m) is not None
-            else None
+            lambda m: apply_on_not_none(condition, _get_global_position_int(m))
         )
 
     def when_attitude(
         self, condition: Callable[[AttitudeMessage], Optional[bool]]
     ) -> TransitionCheckerFactory:
         return self._event_client.when(
-            lambda m: condition(_get_attitude(m))
-            if _get_attitude(m) is not None
-            else None
+            lambda m: apply_on_not_none(condition, _get_attitude(m))
         )
 
     def takeoff(
@@ -319,18 +323,6 @@ class DroneClient:
         return ActAndWaitForCheckerFactory(
             action_callback=lambda: self._commands_queue_tx.send(
                 Takeoff(height_m=height_m)
-            ),
-            wait_for=self.when_local_position(
-                lambda p: abs(height_m - (-p.down)) <= allowed_error_m
-            ),
-        )
-
-    def change_altitude(
-        self, height_m: float, allowed_error_m: float = 0.1
-    ) -> TransitionCheckerFactory:
-        return ActAndWaitForCheckerFactory(
-            action_callback=lambda: self._commands_queue_tx.send(
-                ChangeAltitude(height_m=height_m)
             ),
             wait_for=self.when_local_position(
                 lambda p: abs(height_m - (-p.down)) <= allowed_error_m

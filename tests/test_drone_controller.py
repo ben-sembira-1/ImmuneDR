@@ -77,7 +77,7 @@ def test_drone_takeoff(sim_drone: DroneClient) -> None:
     # TODO assert abs(sim_drone.sim_state.altitude_m - altitude) < 1
 
 
-def test_land(flying_sim_drone: DroneClient):
+def test_land(flying_sim_drone: DroneClient) -> None:
     # TODO start at different heights
     # TODO check that drone is disarmed
     # TODO test when GPS is inactive
@@ -103,7 +103,7 @@ def test_land(flying_sim_drone: DroneClient):
     run_until(sm, target=StateNames.DONE, error_states={StateNames.ERROR})
 
 
-def test_disable_gps(flying_sim_drone: SimulationDroneClient, mavlink_connection):
+def test_disable_gps(flying_sim_drone: SimulationDroneClient) -> None:
     @enum.unique
     class StateNames(enum.Enum):
         FLYING = "Flying"
@@ -135,7 +135,7 @@ def test_disable_gps(flying_sim_drone: SimulationDroneClient, mavlink_connection
     run_until(sm, target=StateNames.NO_GPS, error_states={StateNames.ERROR})
 
 
-def test_turn(flying_sim_drone: DroneClient):
+def test_turn(flying_sim_drone: DroneClient) -> None:
     # TODO parametrize with different start and target headings
     # TODO test illegal heading (out of range)
     # TODO test when GPS is inactive
@@ -159,7 +159,7 @@ def test_turn(flying_sim_drone: DroneClient):
     run_until(sm, target=StateNames.DONE, timeout=timedelta(seconds=3))
 
 
-def test_change_altitude(flying_sim_drone: DroneClient):
+def test_change_altitude(flying_sim_drone: DroneClient) -> None:
     # TODO parametrize with different start and target altitudes
     # TODO test when GPS is inactive
     @enum.unique
@@ -182,7 +182,7 @@ def test_change_altitude(flying_sim_drone: DroneClient):
     run_until(sm, target=StateNames.DONE, timeout=timedelta(seconds=3))
 
 
-def test_set_attitude(flying_sim_drone: DroneClient):
+def test_set_attitude(flying_sim_drone: DroneClient) -> None:
     # TODO does this even work in GUIDED with GPS?
     # TODO parametrize
     @enum.unique
