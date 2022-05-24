@@ -159,29 +159,6 @@ def test_turn(flying_sim_drone: DroneClient) -> None:
     run_until(sm, target=StateNames.DONE, timeout=timedelta(seconds=3))
 
 
-def test_change_altitude(flying_sim_drone: DroneClient) -> None:
-    # TODO parametrize with different start and target altitudes
-    # TODO test when GPS is inactive
-    @enum.unique
-    class StateNames(enum.Enum):
-        CHANGING_ALTITUDE = "Changing altitude"
-        DONE = "Reached target altitude"
-
-    sm = StateMachine(
-        [
-            State(
-                name=StateNames.CHANGING_ALTITUDE,
-                transitions={
-                    StateNames.DONE: flying_sim_drone.change_altitude(height_m=20),
-                },
-            ),
-            State(name=StateNames.DONE, transitions={}),
-        ]
-    )
-
-    run_until(sm, target=StateNames.DONE, timeout=timedelta(seconds=3))
-
-
 def test_set_attitude(flying_sim_drone: DroneClient) -> None:
     # TODO does this even work in GUIDED with GPS?
     # TODO parametrize
