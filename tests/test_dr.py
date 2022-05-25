@@ -22,7 +22,12 @@ def test_drone_dr(
 
     dr_target = upper_left
 
-    dr_state_machine = get_dr_state_machine(flying_sim_drone, dr_target=dr_target)
+    dr_state_machine = get_dr_state_machine(
+        flying_sim_drone,
+        dr_target=dr_target,
+        dr_flying_pitch_deg=-15,
+        dr_estimated_speed_mps=6,
+    )
     # Disabling gps should cause the EKF to fail, eventually triggering DR
     logging.info("Disabling gps")
     TurnOffGps()(mavlink_connection)
@@ -31,7 +36,7 @@ def test_drone_dr(
         dr_state_machine,
         target=DRStateNames.GUIDED_NO_GPS,
         error_states={DRStateNames.ERROR},
-        timeout=timedelta(seconds=5),
+        timeout=timedelta(seconds=10),
     )
     logging.info("Started DR")
     for state in [
@@ -46,7 +51,7 @@ def test_drone_dr(
             dr_state_machine,
             target=state,
             error_states={DRStateNames.ERROR, DRStateNames.IN_THE_AIR},
-            timeout=timedelta(seconds=15),
+            timeout=timedelta(seconds=200),
         )
         logging.info(f"Reached state {state}")
 

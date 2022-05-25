@@ -2,11 +2,15 @@ from dataclasses import dataclass
 import enum
 from functools import lru_cache
 import logging
-import math
+from typing import TYPE_CHECKING, Protocol
 
 from pymavlink.dialects.v20.ardupilotmega import MAVLink_global_position_int_message
 
 from async_state_machine.transitions.combinators import all_of
+from async_state_machine.transitions.types import (
+    TransitionCheckerFactory,
+    TransitionChecker,
+)
 
 from async_state_machine import StateMachine, State
 from async_state_machine.transitions import timeout
@@ -15,6 +19,36 @@ from drones.drone_client import DroneClient
 from drones.geo import GeoLocation
 from drones.latest_messages import LatestMessagesCache
 from drones.mavlink_types import FlightMode, GlobalPositionInt
+
+# A work around https://github.com/python/mypy/issues/9489
+# callback as a class field is tricky, and mypy currently has no support (support reverted)
+class LazyFloat(Protocol):
+    def __call__(self) -> float:
+        ...
+
+
+class ApproximateDistanceTimeoutCheckerFactory(TransitionCheckerFactory):
+    _distance_meter_getter: LazyFloat 
+    _expected_speed_mps: float
+
+    def __init__(
+        self, *, distance_meter_getter: LazyFloat, expected_speed_mps: float
+    ) -> None:
+        super().__init__()
+        self._distance_meter_getter = distance_meter_getter
+        self._expected_speed_mps = expected_speed_mps
+
+    def create_checker(self) -> "TransitionChecker":
+        super().create_checker()
+        distance_m = self._distance_meter_getter()
+        time_estimation_secs = distance_m / self._expected_speed_mps
+        logging.info(
+            f"Estimates {time_estimation_secs} [sec] to get to destination {distance_m} [m] away"
+        )
+        return timeout(secs=time_estimation_secs).create_checker()
+
+
+approximate_distance_timeout = ApproximateDistanceTimeoutCheckerFactory
 
 
 @enum.unique
@@ -36,13 +70,16 @@ class DRStateNames(enum.Enum):
 def get_dr_state_machine(
     flying_sim_drone: DroneClient,
     dr_target: GeoLocation,
+    dr_flying_pitch_deg: float, # neg is forward
+    dr_estimated_speed_mps: float,
+    default_dr_distance: float = float('inf'),
     default_dr_bearing_deg: float = 180,
 ) -> StateMachine:
     latest_messages = LatestMessagesCache(flying_sim_drone)
 
     def get_bearing_to_home() -> float:
         latest = latest_messages.get_latest_message(MAVLink_global_position_int_message)
-        logging.info(f"Calculating the home heading based on latest location: {latest}")
+        logging.info(f"Calculating the bearing to dr target based on latest location: {latest}")
         if latest is None:
             logging.warn(
                 f"No latest location was cached, using default heading: {default_dr_bearing_deg}"
@@ -54,6 +91,21 @@ def get_dr_state_machine(
         bearing = latest_location.bearing_to(dr_target)
         logging.info(f"Using bearing {bearing}")
         return bearing
+
+    def get_distance_to_home() -> float:
+        latest = latest_messages.get_latest_message(MAVLink_global_position_int_message)
+        logging.info(f"Calculating the distance to dr target based on latest location: {latest}")
+        if latest is None:
+            logging.warn(
+                f"No latest location was cached, using default distance: {default_dr_bearing_deg}"
+            )
+            return default_dr_distance
+        assert isinstance(latest, MAVLink_global_position_int_message)
+        latest_location = GeoLocation.from_message(latest)
+
+        distance = latest_location.distance_to(dr_target)
+        logging.info(f"Using distance {distance}")
+        return distance
 
     return StateMachine(
         [
@@ -91,7 +143,7 @@ def get_dr_state_machine(
                 transitions={
                     DRStateNames.INBOUND: flying_sim_drone.turn(
                         heading_deg=get_bearing_to_home
-                    ),  # TODO choose heading
+                    ),
                     DRStateNames.CANCELLING_DR: flying_sim_drone.dr_cancelled(),
                 },
             ),
@@ -101,9 +153,9 @@ def get_dr_state_machine(
                     # TODO calculate distance
                     DRStateNames.LEVELING: all_of(
                         [
-                            timeout(secs=4),
+                            approximate_distance_timeout(distance_meter_getter=get_distance_to_home, expected_speed_mps=dr_estimated_speed_mps ),
                             flying_sim_drone.set_attitude(
-                                pitch_deg=-15,
+                                pitch_deg=dr_flying_pitch_deg,
                                 heading_deg=get_bearing_to_home,
                                 # end_condition=timeout(secs=3)
                             ),
