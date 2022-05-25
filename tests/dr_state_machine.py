@@ -72,9 +72,16 @@ def get_dr_state_machine(
     dr_target: GeoLocation,
     dr_flying_pitch_deg: float, # neg is forward
     dr_estimated_speed_mps: float,
+    dr_climb_throttle: float,
+    dr_descending_throttle: float,
+    dr_climb_to_height_meters_before_returning: float,
+    dr_descending_height_meters_to_change_to_landing: float,
     default_dr_distance: float = float('inf'),
     default_dr_bearing_deg: float = 180,
 ) -> StateMachine:
+
+    assert 0.5 < dr_climb_throttle <= 1.0, "Climb throttle must be bigger then 0.5 (keep height) and at most 1.0"
+    assert 0 <= dr_descending_throttle < 5.0, "Descending throttle must be bigger then 0 (stop engines) and at most 5.0 (keep height)"
     latest_messages = LatestMessagesCache(flying_sim_drone)
 
     def get_bearing_to_home() -> float:
@@ -127,13 +134,12 @@ def get_dr_state_machine(
             State(
                 name=DRStateNames.CLIMBING,
                 transitions={
-                    # TODO const
                     DRStateNames.TURNING: flying_sim_drone.when_global_position(
-                        lambda p: p.height_above_ground_m >= 50
+                        lambda p: p.height_above_ground_m >= dr_climb_to_height_meters_before_returning
                     ),
                     DRStateNames.CLIMBING: flying_sim_drone.set_throttle(
-                        0.8
-                    ),  # TODO speed?
+                        dr_climb_throttle
+                    ),
                     DRStateNames.CANCELLING_DR: flying_sim_drone.dr_cancelled(),
                     # TODO what do we do if this times out? Probably want to DR anyway
                 },
@@ -150,7 +156,6 @@ def get_dr_state_machine(
             State(
                 name=DRStateNames.INBOUND,
                 transitions={
-                    # TODO calculate distance
                     DRStateNames.LEVELING: all_of(
                         [
                             approximate_distance_timeout(distance_meter_getter=get_distance_to_home, expected_speed_mps=dr_estimated_speed_mps ),
@@ -178,11 +183,11 @@ def get_dr_state_machine(
                 name=DRStateNames.DESCENDING,
                 transitions={
                     DRStateNames.LANDING: flying_sim_drone.when_global_position(
-                        lambda p: p.height_above_ground_m <= 15
+                        lambda p: p.height_above_ground_m <= dr_descending_height_meters_to_change_to_landing
                     ),
                     DRStateNames.DESCENDING: flying_sim_drone.set_throttle(
-                        0.2
-                    ),  # TODO speed?
+                        dr_descending_throttle
+                    ),
                     DRStateNames.CANCELLING_DR: flying_sim_drone.dr_cancelled(),
                     # TODO what do we do if this times out?
                 },

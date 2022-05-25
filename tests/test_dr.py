@@ -27,6 +27,10 @@ def test_drone_dr(
         dr_target=dr_target,
         dr_flying_pitch_deg=-15,
         dr_estimated_speed_mps=6,
+        dr_climb_throttle=0.8,
+        dr_descending_throttle=0.2,
+        dr_descending_height_meters_to_change_to_landing=15,
+        dr_climb_to_height_meters_before_returning=50,
     )
     # Disabling gps should cause the EKF to fail, eventually triggering DR
     logging.info("Disabling gps")
