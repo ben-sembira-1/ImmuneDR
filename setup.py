@@ -8,6 +8,7 @@ setup(
     install_requires=[
         "pymavlink",
         "async_state_machine @ git+ssh://git@github.com/ori155/async_state_machine.git",
+        "numpy>=1.20",  # minimal version with type support
     ],
-    extras_require={"test": ["pytest", "pytest-repeat"]},
+    extras_require={"test": ["pytest", "pytest-repeat", "mypy"]},
 )

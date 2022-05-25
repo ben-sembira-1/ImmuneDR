@@ -1,50 +1,15 @@
 import enum
-import logging
-import os
-from pathlib import Path
-import random
-from sre_constants import SUCCESS
-from typing import Generator
-import pytest
+from datetime import timedelta
 
 from async_state_machine import StateMachine, State
 from async_state_machine.transitions.timeout import timeout
-from drones.commands import FlightMode
 
 from drones.drone_client import DroneClient
-from drones.drone_daemon import DroneDaemon
-from drones.testing import TcpSerialConnectionDef, simulation_context
+from drones.mavlink_types import FlightMode
+from drones.testing import SimulationDroneClient
 
-
-@pytest.fixture(scope="function")
-def sim_drone(tmpdir: str) -> Generator[DroneClient, None, None]:
-    port = random.randrange(5900, 6100)
-    logging.info(f"Using random tcp port {port} for simulation connection")
-    serial_ports_override = {}
-
-    external_mavproxy_port = os.environ.get("MAVPROXY_PORT")
-    if external_mavproxy_port is not None and len(external_mavproxy_port) > 0:
-        external_mavproxy_connection = TcpSerialConnectionDef(
-            port=int(external_mavproxy_port), wait_for_connection=True
-        )
-        serial_ports_override[1] = external_mavproxy_connection
-
-    serial_ports_override[0] = TcpSerialConnectionDef(
-        port=port, wait_for_connection=True
-    )
-    with simulation_context(
-        cwd=Path(tmpdir),
-        serial_ports_override=serial_ports_override,
-    ) as sim:
-        mavlink = sim.mavlink_connect_to_serial(0)
-        mavlink.wait_heartbeat(timeout=500)
-        logging.debug("Connected successfully to simulation, received hearteat.")
-        daemon = DroneDaemon(mavlink_connection=mavlink)
-        client = daemon.create_client()
-        try:
-            yield client
-        finally:
-            del daemon
+from tests.state_machine_utils import run_until
+from tests.takeoff_state_machine import get_takeoff_state_machine, TakeoffStateNames
 
 
 def test_drone_heartbeat(sim_drone: DroneClient) -> None:
@@ -68,10 +33,7 @@ def test_drone_heartbeat(sim_drone: DroneClient) -> None:
         ]
     )
 
-    while sm.current_state.name not in {StateNames.ERROR, StateNames.SUCCESS}:
-        sm.tick()
-
-    assert sm.current_state.name == StateNames.SUCCESS
+    run_until(sm, target=StateNames.SUCCESS, error_states={StateNames.ERROR})
 
 
 def test_drone_armed(sim_drone: DroneClient) -> None:
@@ -88,7 +50,7 @@ def test_drone_armed(sim_drone: DroneClient) -> None:
                 name=StateNames.AWAIT_PREFLIGHT,
                 transitions={
                     StateNames.AWAIT_ARM: sim_drone.preflight_finished(),
-                    StateNames.ERROR: timeout(secs=25),
+                    StateNames.ERROR: timeout(secs=120),
                 },
             ),
             State(
@@ -103,59 +65,129 @@ def test_drone_armed(sim_drone: DroneClient) -> None:
         ]
     )
 
-    while sm.current_state.name not in {StateNames.ERROR, StateNames.ARMED}:
-        sm.tick()
-
-    assert sm.current_state.name == StateNames.ARMED
+    run_until(sm, target=StateNames.ARMED, error_states={StateNames.ERROR})
 
 
 def test_drone_takeoff(sim_drone: DroneClient) -> None:
+    altitude = 15
+    sm = get_takeoff_state_machine(sim_drone, altitude)
+    run_until(
+        sm, target=TakeoffStateNames.IN_THE_AIR, error_states={TakeoffStateNames.ERROR}
+    )
+    # TODO assert abs(sim_drone.sim_state.altitude_m - altitude) < 1
+
+
+def test_land(flying_sim_drone: DroneClient) -> None:
+    # TODO start at different heights
+    # TODO check that drone is disarmed
+    # TODO test when GPS is inactive
     @enum.unique
     class StateNames(enum.Enum):
-        AWAIT_PREFLIGHT = "Await Preflight"
-        AWAIT_GUIDED_MODE = "Await Guided Mode"
-        AWAIT_ARM = "Await Arm"
-        TAKING_OFF = "Taking off"
-
-        IN_THE_AIR = "In the air"
+        LANDING = "Landing"
+        DONE = "Landed"
         ERROR = "Error"
 
     sm = StateMachine(
         [
             State(
-                name=StateNames.AWAIT_PREFLIGHT,
+                name=StateNames.LANDING,
                 transitions={
-                    StateNames.AWAIT_GUIDED_MODE: sim_drone.preflight_finished(),
-                    StateNames.ERROR: timeout(secs=120),
-                },
-            ),
-            State(
-                name=StateNames.AWAIT_GUIDED_MODE,
-                transitions={
-                    StateNames.AWAIT_ARM: sim_drone.set_flight_mode(FlightMode.GUIDED),
+                    StateNames.DONE: flying_sim_drone.land(),
                     StateNames.ERROR: timeout(secs=10),
                 },
             ),
+            State(name=StateNames.DONE, transitions={}),
+            State(name=StateNames.ERROR, transitions={}),
+        ]
+    )
+    run_until(sm, target=StateNames.DONE, error_states={StateNames.ERROR})
+
+
+def test_disable_gps(flying_sim_drone: SimulationDroneClient) -> None:
+    @enum.unique
+    class StateNames(enum.Enum):
+        FLYING = "Flying"
+        TURNING_OFF_GPS = "Disabling GPS"
+        NO_GPS = "Lost GPS"
+        ERROR = "Error"
+
+    sm = StateMachine(
+        [
             State(
-                name=StateNames.AWAIT_ARM,
+                name=StateNames.FLYING,
                 transitions={
-                    StateNames.TAKING_OFF: sim_drone.arm(),
-                    StateNames.ERROR: timeout(secs=10),
+                    StateNames.TURNING_OFF_GPS: flying_sim_drone.turn_off_gps(),
+                    StateNames.ERROR: timeout(secs=5),
                 },
             ),
             State(
-                name=StateNames.TAKING_OFF,
+                name=StateNames.TURNING_OFF_GPS,
                 transitions={
-                    StateNames.IN_THE_AIR: sim_drone.takeoff(height_m=15),
-                    StateNames.ERROR: timeout(secs=25),
+                    StateNames.NO_GPS: flying_sim_drone.ekf_bad(),
+                    StateNames.ERROR: timeout(secs=5),
                 },
             ),
-            State(name=StateNames.IN_THE_AIR, transitions={}),
+            State(name=StateNames.NO_GPS, transitions={}),
             State(name=StateNames.ERROR, transitions={}),
         ]
     )
 
-    while sm.current_state.name not in {StateNames.ERROR, StateNames.IN_THE_AIR}:
-        sm.tick()
+    run_until(sm, target=StateNames.NO_GPS, error_states={StateNames.ERROR})
 
-    assert sm.current_state.name == StateNames.IN_THE_AIR
+
+def test_turn(flying_sim_drone: DroneClient) -> None:
+    # TODO parametrize with different start and target headings
+    # TODO test illegal heading (out of range)
+    # TODO test when GPS is inactive
+    @enum.unique
+    class StateNames(enum.Enum):
+        TURNING = "Turning"
+        DONE = "Done turning"
+
+    sm = StateMachine(
+        [
+            State(
+                name=StateNames.TURNING,
+                transitions={
+                    StateNames.DONE: flying_sim_drone.turn(heading_deg=0),
+                },
+            ),
+            State(name=StateNames.DONE, transitions={}),
+        ]
+    )
+
+    run_until(sm, target=StateNames.DONE, timeout=timedelta(seconds=3))
+
+
+def test_set_attitude(flying_sim_drone: DroneClient) -> None:
+    # TODO does this even work in GUIDED with GPS?
+    # TODO parametrize
+    @enum.unique
+    class StateNames(enum.Enum):
+        CHANGING_MODE = "Changing mode to GUIDED_NOGPS"
+        TURNING = "Turning"
+        DONE = "Done turning"
+
+    sm = StateMachine(
+        [
+            State(
+                name=StateNames.CHANGING_MODE,
+                transitions={
+                    StateNames.TURNING: flying_sim_drone.set_flight_mode(
+                        FlightMode.GUIDED_NO_GPS,
+                    ),
+                },
+            ),
+            State(
+                name=StateNames.TURNING,
+                transitions={
+                    StateNames.DONE: flying_sim_drone.set_attitude(
+                        heading_deg=0, pitch_deg=-5, roll_deg=0
+                    ),
+                },
+            ),
+            State(name=StateNames.DONE, transitions={}),
+        ]
+    )
+
+    run_until(sm, target=StateNames.DONE, timeout=timedelta(seconds=3))

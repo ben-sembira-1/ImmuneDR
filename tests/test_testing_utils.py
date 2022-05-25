@@ -14,7 +14,7 @@ def test_simulation_context_can_control_the_connection_port(tmpdir: str) -> None
             0: TcpSerialConnectionDef(port=5980, wait_for_connection=False),
             serial_port: TcpSerialConnectionDef(port, wait_for_connection=True),
             3: dummy_connection,
-        }
+        },
     ) as sim:
         d = sim.mavlink_connect_to_serial(serial_port)
         d.wait_heartbeat()
