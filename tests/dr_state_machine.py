@@ -12,6 +12,7 @@ from async_state_machine import StateMachine, State
 from async_state_machine.transitions import timeout
 
 from drones.drone_client import DroneClient
+from drones.geo import GeoLocation
 from drones.latest_messages import LatestMessagesCache
 from drones.mavlink_types import FlightMode, GlobalPositionInt
 
@@ -32,35 +33,9 @@ class DRStateNames(enum.Enum):
     LANDED = "Landed"
 
 
-# Click: -35.36116244 149.16625641 (-35°21'40.18" 149°09'58.52") (S 55 696817 6084750)
-# Click: -35.36192590 149.16296565
-# Upper left = -35.36151054 149.16379178 (-35°21'41.44" 149°09'49.65") (S 55 696592 6084716)
-# home = -35.36326086 149.16523056
-@dataclass
-class LonLat:
-    lon: float
-    lat: float
-
-
-upper_left = LonLat(lat=-35.36151054, lon=149.16379178)
-home = LonLat(lat=-35.36326086, lon=149.16523056)
-
-
-def get_bearing_deg(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    d_lon = lon2 - lon1
-    x = math.cos(math.radians(lat2)) * math.sin(math.radians(d_lon))
-    y = math.cos(math.radians(lat1)) * math.sin(math.radians(lat2)) - math.sin(
-        math.radians(lat1)
-    ) * math.cos(math.radians(lat2)) * math.cos(math.radians(d_lon))
-    brng = math.atan2(x, y)
-    brng = math.degrees(brng) % 360
-
-    return brng
-
-
 def get_dr_state_machine(
     flying_sim_drone: DroneClient,
-    dr_target: LonLat,
+    dr_target: GeoLocation,
     default_dr_bearing_deg: float = 180,
 ) -> StateMachine:
     latest_messages = LatestMessagesCache(flying_sim_drone)
@@ -74,14 +49,9 @@ def get_dr_state_machine(
             )
             return default_dr_bearing_deg
         assert isinstance(latest, MAVLink_global_position_int_message)
-        latest_location = GlobalPositionInt.from_message(latest)
+        latest_location = GeoLocation.from_message(latest)
 
-        bearing = get_bearing_deg(
-            latest_location.latitude_deg,
-            latest_location.longitude_deg,
-            dr_target.lat,
-            dr_target.lon,
-        )
+        bearing = latest_location.bearing_to(dr_target)
         logging.info(f"Using bearing {bearing}")
         return bearing
 
@@ -131,7 +101,7 @@ def get_dr_state_machine(
                     # TODO calculate distance
                     DRStateNames.LEVELING: all_of(
                         [
-                            timeout(secs=3),
+                            timeout(secs=4),
                             flying_sim_drone.set_attitude(
                                 pitch_deg=-15,
                                 heading_deg=get_bearing_to_home,
