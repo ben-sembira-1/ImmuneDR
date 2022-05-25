@@ -2,7 +2,7 @@ import logging
 import math
 import time
 from datetime import timedelta
-from typing import Callable, Optional, TypeVar, cast
+from typing import Callable, Optional, TypeVar, Union, cast
 
 from pymavlink.dialects.v20.ardupilotmega import (
     MAVLink_message,
@@ -139,17 +139,7 @@ def _get_global_position_int(message: MAVLink_message) -> Optional[GlobalPositio
         return None
     assert isinstance(message, MAVLink_global_position_int_message)
     logging.debug(f"Global position: {message}")
-    return GlobalPositionInt(
-        time_boot_ms=message.time_boot_ms,
-        latitude=message.lat,
-        longitude=message.lon,
-        altitude=message.alt,
-        altitude_above_ground=message.relative_alt,
-        vx=message.vx,
-        vy=message.vy,
-        vz=message.vz,
-        heading_cdeg=message.hdg,
-    )
+    return GlobalPositionInt.from_message(message)
 
 
 def _get_attitude(message: MAVLink_message) -> Optional[AttitudeMessage]:
@@ -246,14 +236,22 @@ class ActUntilFactory(TransitionCheckerFactory):
         )
 
 
-T = TypeVar('T')
-R = TypeVar('R')
+T = TypeVar("T")
+R = TypeVar("R")
+
 
 def apply_on_not_none(func: Callable[[T], R], m: Optional[T]) -> Optional[R]:
     if m is None:
         return None
     assert m is not None
     return func(m)
+
+
+def maybe_lazy_get(
+    maybe_lazy: Union[T, Callable[[], T]],
+) -> T:
+    return maybe_lazy() if callable(maybe_lazy) else maybe_lazy
+
 
 class DroneClient:
     _event_client: _ClientEventReaderFactory[MAVLink_message]
@@ -331,11 +329,11 @@ class DroneClient:
 
     def turn(
         self,
-        heading: float,
+        heading_deg: Union[float, Callable[[], float]],
         allowed_error_deg: float = 5.0,
     ) -> TransitionCheckerFactory:
         return self.set_attitude(
-            heading_deg=heading,
+            heading_deg=heading_deg,
             max_error_deg=allowed_error_deg,
             pitch_deg=0,
             roll_deg=0,
@@ -361,7 +359,7 @@ class DroneClient:
     def set_attitude(
         self,
         pitch_deg: float,
-        heading_deg: float,
+        heading_deg: Union[float, Callable[[], float]],
         roll_deg: float = 0,
         end_condition: Optional[TransitionCheckerFactory] = None,
         max_error_deg: float = 3.0,
@@ -376,7 +374,7 @@ class DroneClient:
         end_condition = end_condition or self.when_attitude(
             lambda p: _is_attitude_correct(
                 p,
-                target_heading_deg=heading_deg,
+                target_heading_deg=maybe_lazy_get(heading_deg),
                 target_pitch_deg=pitch_deg,
                 target_roll_deg=roll_deg,
                 max_error_deg=max_error_deg,
@@ -385,7 +383,9 @@ class DroneClient:
         return ActUntilFactory(
             action_callback=lambda: self._commands_queue_tx.send(
                 SetAttitude(
-                    heading_deg=heading_deg, pitch_deg=pitch_deg, roll_deg=roll_deg
+                    heading_deg=maybe_lazy_get(heading_deg),
+                    pitch_deg=pitch_deg,
+                    roll_deg=roll_deg,
                 )
             ),
             end_condition=end_condition,

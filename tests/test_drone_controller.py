@@ -149,7 +149,7 @@ def test_turn(flying_sim_drone: DroneClient) -> None:
             State(
                 name=StateNames.TURNING,
                 transitions={
-                    StateNames.DONE: flying_sim_drone.turn(heading=0),
+                    StateNames.DONE: flying_sim_drone.turn(heading_deg=0),
                 },
             ),
             State(name=StateNames.DONE, transitions={}),

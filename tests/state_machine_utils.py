@@ -1,11 +1,12 @@
 from datetime import timedelta, datetime
+import logging
 from typing import Union, Optional, Set
 
 from async_state_machine import StateMachine
 from async_state_machine.state_machine import StateName
 
 
-class StateMachineError(Exception):
+class StateMachineError(AssertionError):
     pass
 
 
@@ -28,6 +29,7 @@ def run_until(
         targets = {target}
     error_states = error_states or set()
 
+    sm.on_state_change(lambda s: logging.info(f"Reached state: {str(s.name)}"))
     start_time = datetime.now()
     while sm.current_state.name not in targets | error_states:
         if timeout is not None and (datetime.now() - start_time > timeout):

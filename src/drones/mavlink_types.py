@@ -4,6 +4,8 @@ from typing import cast
 
 import numpy as np
 
+from pymavlink.dialects.v20.ardupilotmega import MAVLink_global_position_int_message
+
 
 class FlightMode(Enum):
     """
@@ -58,6 +60,30 @@ class GlobalPositionInt:
     @property
     def height_above_ground_m(self) -> float:
         return self.altitude_above_ground / 1000
+
+    @property
+    def latitude_deg(self) -> float:
+        return self.latitude * 1e-7
+
+    @property
+    def longitude_deg(self) -> float:
+        return self.longitude * 1e-7
+
+    @classmethod
+    def from_message(
+        cls, message: MAVLink_global_position_int_message
+    ) -> "GlobalPositionInt":
+        return cls(
+            time_boot_ms=message.time_boot_ms,
+            latitude=message.lat,
+            longitude=message.lon,
+            altitude=message.alt,
+            altitude_above_ground=message.relative_alt,
+            vx=message.vx,
+            vy=message.vy,
+            vz=message.vz,
+            heading_cdeg=message.hdg,
+        )
 
 
 @dataclass
